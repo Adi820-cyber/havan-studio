@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import confetti from 'canvas-confetti';
 import {
-  Calendar, MapPin, Lock, Unlock, Sparkles, CheckCircle2, Music, Users,
-  Share2, Key, Download, ExternalLink, ArrowLeft, Send, Check, QrCode, Copy, Volume2, VolumeX,
-  MessageSquare, Shirt, Clock, Hourglass, PackageOpen
+  Calendar, MapPin, Lock, Unlock, CheckCircle2, Users,
+  Share2, Key, Download, ExternalLink, ArrowLeft, Send, Check, Copy,
+  MessageSquare, Shirt, Hourglass, PackageOpen
 } from 'lucide-react';
 import { playPop, playCelebrationChord, playWhoosh } from '../utils/soundEffects';
 import { api } from '../services/api';
@@ -12,7 +12,7 @@ import { RSVP_ICON } from '../lib/icons';
 import { useLiveEvent, useRefreshOnFocus } from '../lib/useLiveEvent';
 import SeenHaiReaction from './SeenHaiReaction';
 import HostPanel from './HostPanel';
-import { fontById, revealById, soundById, houseRuleLine } from '../data/vibe';
+import { fontById, revealById, houseRuleLine } from '../data/vibe';
 import RevealOnScroll from './RevealOnScroll';
 
 export default function LiveInviteView({ slug, inviteToken = null, onBackToStudio }) {
@@ -51,11 +51,6 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState('');
-
-  // Audio Synth
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
-  const audioContextRef = useRef(null);
-  const oscillatorsRef = useRef([]);
 
   const cardRef = useRef(null);
 
@@ -103,9 +98,6 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
 
   useEffect(() => {
     loadEvent();
-    return () => {
-      stopSynthesizer();
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, inviteToken]);
 
@@ -137,110 +129,9 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
   // Safety net for a websocket that dropped while the tab was asleep.
   useRefreshOnFocus(refreshQuietly);
 
-  // Mouse 3D tilt
-  const handleMouseMove = (e) => {
-    if (!cardRef.current) return;
-    const rect = cardRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    cardRef.current.style.setProperty('--mouse-x', `${x}px`);
-    cardRef.current.style.setProperty('--mouse-y', `${y}px`);
 
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    const rotateX = ((y - centerY) / centerY) * -4;
-    const rotateY = ((x - centerX) / centerX) * 4;
-    cardRef.current.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
-  };
 
-  const handleMouseLeave = () => {
-    if (cardRef.current) {
-      cardRef.current.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg)';
-    }
-  };
 
-  // Web Audio Synthesizer
-  const toggleSynthesizer = () => {
-    if (isPlayingAudio) {
-      stopSynthesizer();
-    } else {
-      startSynthesizer();
-    }
-  };
-
-  const startSynthesizer = () => {
-    try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      const ctx = new AudioContext();
-      audioContextRef.current = ctx;
-
-      const master = ctx.createGain();
-      master.gain.setValueAtTime(0.2, ctx.currentTime);
-
-      // The host picked one of twelve soundscapes in the studio; this plays
-      // that one rather than the single drone every invitation used to share.
-      // Falling back to the stored chord keeps older invites working.
-      const scape = soundById(event?.customization?.soundId);
-      const freqs = scape?.freqs?.length
-        ? scape.freqs
-        : event?.customization?.soundFreqs?.length
-          ? event.customization.soundFreqs
-          : [138.59, 207.65, 277.18];
-
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(scape?.cutoff ?? 500, ctx.currentTime);
-      master.connect(filter);
-      filter.connect(ctx.destination);
-
-      if (scape?.pulse > 0) {
-        const pulseOsc = ctx.createOscillator();
-        const pulseGain = ctx.createGain();
-        pulseOsc.frequency.value = scape.pulse;
-        pulseGain.gain.value = 0.05;
-        pulseOsc.connect(pulseGain);
-        pulseGain.connect(master.gain);
-        pulseOsc.start();
-        oscillatorsRef.current.push(pulseOsc);
-      }
-
-      oscillatorsRef.current = freqs.map((freq, i) => {
-        const osc = ctx.createOscillator();
-        osc.type = scape?.wave || 'sawtooth';
-        osc.frequency.value = freq;
-        if (scape?.detune) osc.detune.value = (i - (freqs.length - 1) / 2) * scape.detune;
-
-        const lfo = ctx.createOscillator();
-        const lfoGain = ctx.createGain();
-        lfo.frequency.value = scape?.lfoRate ?? 0.2;
-        lfoGain.gain.value = scape?.lfoDepth ?? 0.8;
-        lfo.connect(osc.frequency);
-        lfo.start();
-
-        osc.connect(master);
-        osc.start();
-        return osc;
-      });
-
-      setIsPlayingAudio(true);
-    } catch (e) {
-      console.warn('Web Audio playback error:', e);
-    }
-  };
-
-  const stopSynthesizer = () => {
-    if (oscillatorsRef.current) {
-      oscillatorsRef.current.forEach((osc) => {
-        try { osc.stop(); } catch (e) {}
-      });
-      oscillatorsRef.current = [];
-    }
-    if (audioContextRef.current) {
-      try { audioContextRef.current.close(); } catch (e) {}
-      audioContextRef.current = null;
-    }
-    setIsPlayingAudio(false);
-  };
 
   // Tapping one of the three Seen Hai replies
   const handleRsvpOptionClick = (statusKey) => {
@@ -383,9 +274,8 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#080a12', color: '#fff' }}>
-        <div style={{ width: 44, height: 44, borderRadius: '50%', border: '3px solid rgba(255, 64, 125, 0.2)', borderTopColor: '#ff407d', animation: 'spin 0.8s linear infinite' }} />
-        <p style={{ marginTop: 16, fontSize: '0.92rem', color: 'rgba(255, 255, 255, 0.6)' }}>Loading sensory invitation...</p>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#080a12' }}>
+        <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid rgba(230,213,174,0.15)', borderTopColor: 'var(--brass)', animation: 'spin 0.8s linear infinite' }} />
       </div>
     );
   }
@@ -459,15 +349,7 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
     : '';
 
   return (
-    <div style={{ position: 'relative', minHeight: '100vh', background: '#07090e', color: '#fff', overflowX: 'hidden', paddingBottom: 60 }}>
-      {/* Dynamic Ambient Background Orbs */}
-      <div className="ambient-backdrop">
-        <div className="ambient-orb orb-1" />
-        <div className="ambient-orb orb-2" />
-        <div className="ambient-orb orb-3" />
-      </div>
-
-      {/* Static ambient wash instead of a per-frame particle canvas */}
+    <div style={{ position: 'relative', minHeight: '100vh', background: 'var(--indigo-deep)', color: '#fff', overflowX: 'hidden', paddingBottom: 60 }}>
       <div className="lp-grain" aria-hidden="true" />
 
       {/* Sticky Floating Action Nav */}
@@ -505,16 +387,14 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {/* Web Audio Synthesizer Toggle */}
           <button
-            onClick={toggleSynthesizer}
-            title="Toggle Live Web Audio Synthesizer"
+            onClick={() => setIsShareOpen(true)}
             style={{
-              background: isPlayingAudio ? 'rgba(255, 64, 125, 0.25)' : 'rgba(255, 255, 255, 0.06)',
-              border: isPlayingAudio ? '1px solid #ff407d' : '1px solid rgba(255, 255, 255, 0.1)',
-              color: isPlayingAudio ? '#ff407d' : '#fff',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              color: '#fff',
               borderRadius: 999,
-              padding: '6px 12px',
+              padding: '6px 14px',
               fontSize: '0.8rem',
               display: 'flex',
               alignItems: 'center',
@@ -522,47 +402,42 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
               cursor: 'pointer'
             }}
           >
-            {isPlayingAudio ? <Volume2 size={14} /> : <VolumeX size={14} />}
-            <span>{isPlayingAudio ? 'Audio Playing' : 'Play Vibes'}</span>
-          </button>
-
-          {/* Share Button */}
-          <button
-            onClick={() => setIsShareOpen(true)}
-            className="btn-primary"
-            style={{ padding: '6px 14px', fontSize: '0.8rem' }}
-          >
             <Share2 size={14} />
             <span>Share</span>
           </button>
         </div>
       </div>
 
-      {/* Main Sensory Card Container */}
-      <main style={{ maxWidth: 520, margin: '28px auto 0', padding: '0 16px', position: 'relative', zIndex: 10 }}>
+      {/* Main content — side-by-side on desktop, stacked on mobile */}
+      <main style={{
+        maxWidth: 1100,
+        margin: '28px auto 0',
+        padding: '0 16px',
+        position: 'relative',
+        zIndex: 10,
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 32,
+        alignItems: 'flex-start',
+        justifyContent: 'center'
+      }}>
         
-        {/* The host's own view: who replied, what they said, and their details.
-            `is_host` is decided by the database from the session, and the RPC
-            behind HostPanel refuses anyone else, so this is not a client gate. */}
-        {event.isHost && <HostPanel slug={slug} eventId={event.id} />}
-
-        {/* The invitation, opening the way the host chose. The reveal lives on
-            the wrapper so the card keeps its chamfer, borders and selection. */}
-        <RevealOnScroll revealId={reveal.id}>
+        {/* Left Column: Card */}
+        <div style={{ flex: '1 1 400px', maxWidth: 520, width: '100%' }}>
+          {/* The invitation, opening the way the host chose. The reveal lives on
+              the wrapper so the card keeps its chamfer, borders and selection. */}
+          <RevealOnScroll revealId={reveal.id}>
         <div
           ref={cardRef}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={handleMouseLeave}
-          className="spotlight-card havan-card"
+          className="havan-card"
           style={{
             overflow: 'hidden',
             border: '1px solid rgba(230, 213, 174, 0.18)',
-            background: 'var(--indigo)',
-            transition: 'transform 0.15s ease-out'
+            background: 'var(--indigo)'
           }}
         >
           {/* Artwork Stage */}
-          <div style={{ position: 'relative', height: 280, overflow: 'hidden' }}>
+          <div style={{ position: 'relative', height: 180, overflow: 'hidden' }}>
             <img
               src={coverImg}
               alt={event.title}
@@ -577,26 +452,24 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
             />
 
             {/* Vibe badge */}
-            <div style={{ position: 'absolute', top: 16, left: 16, right: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div
-                style={{
-                  background: 'rgba(0, 0, 0, 0.65)',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  borderRadius: 999,
-                  padding: '4px 12px',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6
-                }}
-              >
-                <Sparkles size={12} color="#ff407d" />
-                <span>{custom.vibeTag || 'Exclusive Event'}</span>
+            {custom.vibeTag && (
+              <div style={{ position: 'absolute', top: 16, left: 16 }}>
+                <span
+                  style={{
+                    background: 'rgba(0, 0, 0, 0.55)',
+                    backdropFilter: 'blur(8px)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: 999,
+                    padding: '4px 12px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    color: '#fff'
+                  }}
+                >
+                  {custom.vibeTag}
+                </span>
               </div>
-
-            </div>
+            )}
 
             {/* Title & Host on Artwork */}
             <div style={{ position: 'absolute', bottom: 16, left: 20, right: 20 }}>
@@ -620,10 +493,10 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
           </div>
 
           {/* Card Body */}
-          <div style={{ padding: '20px 24px' }}>
+          <div style={{ padding: '16px 20px' }}>
             {/* Description */}
             {event.description && (
-              <p style={{ fontSize: '0.88rem', color: 'rgba(255, 255, 255, 0.75)', lineHeight: 1.5, marginBottom: 20 }}>
+              <p style={{ fontSize: '0.88rem', color: 'rgba(255, 255, 255, 0.75)', lineHeight: 1.5, marginBottom: 16 }}>
                 {event.description}
               </p>
             )}
@@ -636,11 +509,11 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
                 // Tiles stretch to fill rather than leaving a hole when the
                 // host left the dress code or the logistics blank.
                 gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                gap: 12,
-                marginBottom: 20
+                gap: 8,
+                marginBottom: 16
               }}
             >
-              <div style={{ background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: 12, padding: '12px' }}>
+              <div style={{ background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: 12, padding: '10px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ff407d', fontSize: '0.74rem', fontWeight: 700, textTransform: 'uppercase' }}>
                   <Calendar size={13} />
                   <span>Date & Time</span>
@@ -654,7 +527,7 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
               </div>
 
               {dressCodeText && (
-                <div style={{ background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: 12, padding: '12px' }}>
+                <div style={{ background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: 12, padding: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ffd700', fontSize: '0.74rem', fontWeight: 700, textTransform: 'uppercase' }}>
                     <Shirt size={13} strokeWidth={1.9} />
                     <span>Dress Code</span>
@@ -666,7 +539,7 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
               )}
 
               {houseRuleLines.length > 0 && (
-                <div style={{ background: 'rgba(230, 213, 174, 0.04)', border: '1px solid rgba(230, 213, 174, 0.12)', padding: '12px', clipPath: 'var(--chamfer-sm)' }}>
+                <div style={{ background: 'rgba(230, 213, 174, 0.04)', border: '1px solid rgba(230, 213, 174, 0.12)', padding: '10px', clipPath: 'var(--chamfer-sm)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--verdigris)', fontSize: '0.74rem', fontWeight: 700, textTransform: 'uppercase' }}>
                     <PackageOpen size={13} strokeWidth={1.9} />
                     <span>House rules</span>
@@ -687,8 +560,8 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
             <div
               style={{
                 borderRadius: 16,
-                padding: '16px',
-                marginBottom: 24,
+                padding: '12px',
+                marginBottom: 16,
                 position: 'relative',
                 overflow: 'hidden',
                 background: isVenueUnlocked
@@ -700,43 +573,22 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
               }}
             >
               {!isVenueUnlocked ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <div
-                    style={{
-                      width: 42,
-                      height: 42,
-                      borderRadius: 12,
-                      background: 'rgba(255, 64, 125, 0.15)',
-                      border: '1px solid rgba(255, 64, 125, 0.3)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#ff407d',
-                      flexShrink: 0
-                    }}
-                  >
-                    <Lock size={20} />
-                  </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Lock size={16} strokeWidth={1.8} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0 }} />
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', fontWeight: 700, color: '#ff407d' }}>
-                      <span>SECRET VENUE LOCKED</span>
-                      <span>🔒</span>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#fff' }}>
+                      {event.venueName || 'Venue'}
                     </div>
-                    <div style={{ fontSize: '0.76rem', color: 'rgba(255, 255, 255, 0.5)', marginTop: 3 }}>
-                      RSVP "Going" to instantly reveal the address, door access code & directions!
+                    <div style={{ fontSize: '0.77rem', color: 'rgba(255, 255, 255, 0.45)', marginTop: 2 }}>
+                      Reply to see the full address
                     </div>
                   </div>
                 </div>
               ) : (
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', fontWeight: 800, color: '#ffd700' }}>
-                      <Sparkles size={14} />
-                      <span>VENUE UNLOCKED — VIP ACCESS</span>
-                    </div>
-                    <span style={{ fontSize: '0.68rem', background: 'rgba(255, 215, 0, 0.2)', color: '#ffd700', padding: '2px 8px', borderRadius: 999, border: '1px solid rgba(255, 215, 0, 0.4)', fontWeight: 700 }}>
-                      CONFIRMED GUEST
-                    </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--brass)' }}>
+                    <Unlock size={13} strokeWidth={2} />
+                    Address
                   </div>
 
                   <div style={{ fontSize: '1rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -809,7 +661,7 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
                 Previously a host tapping them got a "Complete Your RSVP" form
                 asking them to tell themselves they were coming, and the reply
                 would have counted them as their own guest. */}
-            <div style={{ marginBottom: 24 }}>
+            <div style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 10, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#fff' }}>
                   {event.isHost ? 'What your guests tap' : 'Seen hai. Ab bata?'}
@@ -950,17 +802,17 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
                   style={{
                     marginTop: 12,
                     padding: '10px 14px',
-                    background: 'rgba(16, 185, 129, 0.15)',
-                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    background: 'rgba(16, 185, 129, 0.12)',
+                    border: '1px solid rgba(16, 185, 129, 0.25)',
                     borderRadius: 12,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', color: '#10b981', fontWeight: 700 }}>
-                    <CheckCircle2 size={16} />
-                    <span>You're on the list, {myRsvp?.guestName || 'Friend'}!</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', color: '#10b981', fontWeight: 600 }}>
+                    <CheckCircle2 size={15} strokeWidth={1.9} />
+                    <span>You're in</span>
                   </div>
                   <button
                     onClick={downloadCalendarFile}
@@ -968,40 +820,25 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
                     style={{ padding: '4px 10px', fontSize: '0.72rem' }}
                   >
                     <Download size={12} />
-                    <span>.ICS</span>
+                    <span>Add to calendar</span>
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Quick Actions Row */}
-            <div className="lp-pair" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <button
-                onClick={downloadCalendarFile}
-                className="btn-secondary"
-                style={{ padding: '10px', fontSize: '0.82rem', width: '100%' }}
-              >
-                <Download size={14} />
-                <span>Add to Calendar</span>
-              </button>
 
-              <button
-                onClick={() => setIsShareOpen(true)}
-                className="btn-primary"
-                style={{ padding: '10px', fontSize: '0.82rem', width: '100%' }}
-              >
-                <Share2 size={14} />
-                <span>Share Invite</span>
-              </button>
-            </div>
           </div>
         </div>
         </RevealOnScroll>
+        </div>
 
-        {/* Social Guest Wall / Hype Board */}
+        {/* Right column: host panel + notes */}
+        <div style={{ flex: '1 1 400px', maxWidth: 520, width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {/* The host's own view: who replied, what they said, and their details. */}
+          {event.isHost && <HostPanel slug={slug} eventId={event.id} />}
+
         <div
           style={{
-            marginTop: 28,
             borderRadius: 20,
             padding: '20px',
             background: 'rgba(255, 255, 255, 0.03)',
@@ -1046,7 +883,7 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
             <div style={{ display: 'flex', gap: 8 }}>
               <input
                 type="text"
-                placeholder="Leave a message or vibe check..."
+              placeholder="Leave a note…"
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
                 style={{
@@ -1062,8 +899,18 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
               <button
                 type="submit"
                 disabled={isPostingComment}
-                className="btn-primary"
-                style={{ padding: '8px 14px', fontSize: '0.82rem', flexShrink: 0 }}
+                style={{
+                  padding: '8px 14px',
+                  fontSize: '0.82rem',
+                  flexShrink: 0,
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  color: '#fff',
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
               >
                 <Send size={14} />
               </button>
@@ -1205,6 +1052,7 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
             )}
           </div>
         </div>
+        </div>
       </main>
 
       {/* The meme reaction after a reply. Owns its own confetti so the intensity
@@ -1227,14 +1075,13 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
           }}
         >
           <div
-            className="glass-panel"
             style={{
               width: '100%',
               maxWidth: 420,
               padding: 24,
               borderRadius: 20,
-              background: 'linear-gradient(150deg, #131726, #090c14)',
-              border: '1px solid rgba(255, 64, 125, 0.3)'
+              background: 'rgba(16,18,26,0.99)',
+              border: '1px solid rgba(255, 255, 255, 0.11)'
             }}
           >
             <h3 style={{ fontSize: '1.24rem', fontWeight: 700, color: '#fff', marginBottom: 5 }}>
@@ -1375,14 +1222,13 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
           }}
         >
           <div
-            className="glass-panel"
             style={{
               width: '100%',
               maxWidth: 440,
               padding: 24,
               borderRadius: 20,
-              background: 'linear-gradient(150deg, #131726, #090c14)',
-              border: '1px solid rgba(255, 215, 0, 0.3)'
+              background: 'rgba(16,18,26,0.99)',
+              border: '1px solid rgba(255, 255, 255, 0.11)'
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -1400,8 +1246,8 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
               </button>
             </div>
 
-            <p style={{ fontSize: '0.82rem', color: 'rgba(255, 255, 255, 0.65)', marginBottom: 16 }}>
-              Share this sensory link on any app. Guests RSVP in under 15 seconds without creating an account!
+            <p style={{ fontSize: '0.82rem', color: 'rgba(255, 255, 255, 0.5)', marginBottom: 16 }}>
+              Send the link however you'd like.
             </p>
 
             {/* QR Code */}

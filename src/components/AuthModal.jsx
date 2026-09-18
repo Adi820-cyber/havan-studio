@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Sparkles, Lock, Mail, User, ArrowRight, CheckCircle2, AlertCircle, AtSign } from 'lucide-react';
 import { api } from '../services/api';
 import Avatar from './Avatar';
@@ -9,16 +9,43 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  // The username. It is claimed here rather than in a later settings screen
-  // because a profile with no handle cannot be linked to or found, and asking
-  // for it after the fact means most accounts never get one.
   const [handle, setHandle] = useState('');
-  // Kept only because signUp still accepts it; the avatar is now derived from the
-  // name rather than picked, so nothing sets this.
-  const avatar = '';
+  const [handleStatus, setHandleStatus] = useState('');
+  
+  const [avatarOptions] = useState(() => {
+    const allIds = Array.from({ length: 67 }, (_, i) => i + 1);
+    for (let i = allIds.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [allIds[i], allIds[j]] = [allIds[j], allIds[i]];
+    }
+    return allIds.slice(0, 8).map(id => `/avatars/png/${id}.png`);
+  });
+  
+  const [avatar, setAvatar] = useState(avatarOptions[0]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  useEffect(() => {
+    if (!handle.trim()) {
+      setHandleStatus('');
+      return;
+    }
+    setHandleStatus('checking');
+    const timer = setTimeout(async () => {
+      try {
+        const profile = await api.getPublicProfile(handle.trim().toLowerCase());
+        if (profile) {
+          setHandleStatus('taken');
+        } else {
+          setHandleStatus('available');
+        }
+      } catch (err) {
+        setHandleStatus('available');
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [handle]);
 
   if (!isOpen) return null;
 
@@ -37,6 +64,11 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
       } else {
         if (!name.trim()) {
           setError('Please provide your name');
+          setLoading(false);
+          return;
+        }
+        if (handleStatus === 'taken') {
+          setError('That username is already taken. Please pick another.');
           setLoading(false);
           return;
         }
@@ -317,18 +349,49 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
                   }}
                 />
               </div>
+              {handleStatus === 'taken' && (
+                <div style={{ fontSize: '0.75rem', color: '#fca5a5', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <AlertCircle size={12} /> This username is taken, please pick another.
+                </div>
+              )}
+              {handleStatus === 'available' && handle.length > 0 && (
+                <div style={{ fontSize: '0.75rem', color: '#a7f3d0', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <CheckCircle2 size={12} /> Username available!
+                </div>
+              )}
             </div>
           )}
 
-          {/* No emoji picker. The avatar is your initial in a colour derived from
-              your name, so there is nothing to choose and it looks the same on
-              every device. */}
           {mode === 'register' && name.trim() && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-              <Avatar name={name} size={40} />
-              <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)' }}>
-                This will be your avatar
-              </span>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'rgba(255, 255, 255, 0.7)', marginBottom: '6px' }}>
+                Pick an Avatar
+              </label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {avatarOptions.map(url => (
+                  <button
+                    key={url}
+                    type="button"
+                    onClick={() => setAvatar(url)}
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: '50%',
+                      padding: 0,
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: avatar === url ? '2px solid #ff407d' : '1px solid rgba(255, 255, 255, 0.1)',
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <img src={url} alt="Avatar option" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
