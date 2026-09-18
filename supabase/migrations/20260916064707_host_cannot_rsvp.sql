@@ -1,0 +1,11 @@
+-- Intentionally empty — see 20260916065500_host_cannot_rsvp_guard.sql.
+--
+-- This version got pushed while the file was still a blank stub, so the remote
+-- migration history records it as applied even though it changed nothing. Filling
+-- it in afterwards would have been silently ineffective: `supabase db push` skips
+-- versions already present in the history, so the guard would never have reached
+-- the database while appearing to be committed.
+--
+-- Rather than repair history, the actual change was moved to the next migration.
+-- A fresh clone applies this no-op and then the real one, ending in the same state
+-- as the linked project.

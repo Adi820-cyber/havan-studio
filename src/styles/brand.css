@@ -1,0 +1,290 @@
+/* ============================================================================
+   havan — Bombay Deco, refracted.
+
+   This file is loaded *after* index.css and deliberately overrides it. The
+   original stylesheet was a generic dark-glass system — pill buttons, 24px
+   radii, purple-to-cyan gradients, glassmorphism — which is the exact list the
+   brand direction says never to do. Rewriting every component's inline styles
+   would have meant touching thirty files and breaking things that work, so the
+   correction happens here instead, in one place, where it can be read and
+   argued with.
+
+   `!important` does beat an inline style attribute, which is what makes this
+   possible: components still ship `borderRadius: 14` in their JSX and the
+   chamfer wins anyway. Where a component is rewritten later it can simply drop
+   the inline value.
+
+   The system, from the direction:
+     · Six colours. Two are bases — Jodhpur night and Jaisalmer stone. Rani is
+       rationed to one element per screen.
+     · Chamfers, never radii. 14px cards, 10px buttons, 6px avatars.
+     · Two families. Clash Display carries the deco and the wedge; Mukta carries
+       India, because it sets Latin and Devanagari as siblings.
+     · Two-pixel ink borders on the day base instead of shadows.
+   ========================================================================= */
+
+:root {
+  /* ── the six ── */
+  --indigo: #1c2a4b;        /* Jodhpur night — every event page, always */
+  --indigo-deep: #111a32;
+  --indigo-lift: #24355c;
+  --sand: #e6d5ae;          /* Jaisalmer stone — day base, reading surfaces */
+  --sand-deep: #d3bc8a;
+  --sand-dim: #b9a880;
+  --brass: #c0922e;         /* the one primary action per screen */
+  --brass-lift: #d8a63c;
+  --verdigris: #4e8b7c;     /* confirmed, vouched, going. focus rings. */
+  --rani: #d23c78;          /* one thing per screen. the live moment. */
+  --chrome: #c9cfd6;        /* hairlines, dividers, disabled */
+  --ink: #19140f;
+
+  /* ── type ── */
+  --font-display: 'Clash Display', 'Unbounded', Georgia, serif;
+  --font-sans: 'Mukta', 'Segoe UI', system-ui, sans-serif;
+  --font-luxury: 'Clash Display', Georgia, serif;
+
+  /* ── chamfers ──
+     Two corners is the wedge and goes on most things. Four is the ziggurat and
+     is reserved: the share card, the published-invite card. */
+  --chamfer-card: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+  --chamfer-btn: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  --chamfer-sm: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  --chamfer-zig: polygon(
+    14px 0, calc(100% - 14px) 0, 100% 14px, 100% calc(100% - 14px),
+    calc(100% - 14px) 100%, 14px 100%, 0 calc(100% - 14px), 0 14px
+  );
+
+  /* Legacy names still referenced by index.css, repointed at the real palette
+     so nothing has to be hunted down one selector at a time. */
+  --bg-primary: var(--indigo-deep);
+  --bg-card: rgba(28, 42, 75, 0.82);
+  --bg-card-hover: rgba(36, 53, 92, 0.9);
+  --glass-border: rgba(230, 213, 174, 0.16);
+  --glass-border-highlight: rgba(192, 146, 46, 0.55);
+  --text-primary: var(--sand);
+  --text-secondary: rgba(230, 213, 174, 0.62);
+  --text-muted: rgba(230, 213, 174, 0.38);
+  --primary-glow: var(--brass);
+  --accent-glow: var(--brass);
+  --theme-gradient: linear-gradient(135deg, var(--brass) 0%, var(--verdigris) 100%);
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --shadow-glow: none;
+}
+
+/* ── the stepwell ──
+   Pana Meena ka Kund flattened into a repeat: a Jaipur stepwell, a Deco
+   ziggurat and a cubist grid at once. Surface texture at low contrast, the
+   loading state at full. Never louder than 14% as texture. */
+.havan-stepwell {
+  background-image:
+    linear-gradient(45deg, currentColor 25%, transparent 25%, transparent 75%, currentColor 75%),
+    linear-gradient(45deg, currentColor 25%, transparent 25%, transparent 75%, currentColor 75%);
+  background-size: 22px 22px;
+  background-position: 0 0, 11px 11px;
+  opacity: 0.1;
+}
+
+body {
+  background: var(--indigo-deep);
+  color: var(--sand);
+  font-family: var(--font-sans);
+}
+
+/* Every event page lives on the night base regardless of the phone's setting. */
+.lp-scope {
+  background: var(--indigo-deep) !important;
+  color: var(--sand) !important;
+  font-family: var(--font-sans);
+}
+
+h1, h2, h3, h4,
+.lp-h1, .lp-h2, .lp-h3 {
+  font-family: var(--font-display) !important;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+}
+
+/* Dates and counts are the most-read thing on an invite, so they get display
+   treatment rather than a monospaced label. */
+.havan-num {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Devanagari sits at the same size and weight as the Latin beside it — Mukta
+   draws both by the same hand, which is the whole reason it was chosen. */
+.havan-hin {
+  font-family: 'Mukta', sans-serif;
+  font-weight: 500;
+}
+
+/* ══════════════════════ chamfers, never radii ══════════════════════
+   The attribute selector catches every component that still sets a radius
+   inline. Circles are spared: `50%` means an avatar or a swatch, and those get
+   the 6px chamfer applied by their own class instead of being squared off into
+   something unreadable. */
+
+.lp-scope [style*="border-radius"]:not([style*="50%"]),
+.lp-scope button,
+.lp-scope input,
+.lp-scope textarea,
+.lp-scope select,
+.lp-btn,
+.lp-chip,
+.lp-card {
+  border-radius: 0 !important;
+}
+
+.lp-btn,
+.lp-chip,
+.lp-scope button:not(.havan-plain),
+.lp-scope input,
+.lp-scope textarea {
+  clip-path: var(--chamfer-btn);
+}
+
+.lp-card,
+.havan-card {
+  clip-path: var(--chamfer-card);
+}
+
+.havan-zig {
+  clip-path: var(--chamfer-zig);
+}
+
+/* A chamfered element cannot also carry a soft outer shadow — the clip eats it.
+   The direction says two-pixel ink borders instead of shadows anyway. */
+.lp-btn,
+.lp-chip,
+.lp-card,
+.havan-card {
+  box-shadow: none !important;
+}
+
+/* ══════════════════════ buttons ══════════════════════
+   Brass for the one primary action per screen. If there are two, one of them
+   isn't primary. */
+
+.lp-btn {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.lp-btn-primary {
+  background: var(--brass) !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--brass) !important;
+}
+
+.lp-btn-primary:hover {
+  background: var(--brass-lift) !important;
+  border-color: var(--brass-lift) !important;
+}
+
+.lp-btn-ghost {
+  background: transparent !important;
+  color: var(--sand) !important;
+  border: 1px solid rgba(230, 213, 174, 0.3) !important;
+}
+
+.lp-btn-ghost:hover {
+  border-color: var(--sand) !important;
+  background: rgba(230, 213, 174, 0.06) !important;
+}
+
+.lp-chip {
+  background: rgba(230, 213, 174, 0.05) !important;
+  border: 1px solid rgba(230, 213, 174, 0.18) !important;
+  color: rgba(230, 213, 174, 0.78) !important;
+  font-family: var(--font-sans);
+}
+
+.lp-chip:hover {
+  border-color: rgba(192, 146, 46, 0.6) !important;
+  color: var(--sand) !important;
+}
+
+.lp-chip[aria-pressed="true"] {
+  border-color: var(--brass) !important;
+  background: rgba(192, 146, 46, 0.14) !important;
+  color: var(--sand) !important;
+}
+
+/* Focus rings are verdigris, per the state language. Never removed — a chamfer
+   is not a reason to make the product unusable by keyboard. */
+.lp-scope :focus-visible {
+  outline: 2px solid var(--verdigris);
+  outline-offset: 2px;
+}
+
+/* ══════════════════════ what the direction forbids ══════════════════════ */
+
+/* No glassmorphism. The blur stays only on the sticky headers, where it is
+   doing legibility work rather than decoration. */
+.lp-scope [style*="backdrop-filter"]:not(header):not(.havan-keep-blur) {
+  backdrop-filter: none !important;
+}
+
+/* No ambient gradient glow. The one permitted gradient is the warm light behind
+   the gate, which is drawn by the reveal, not by the page. */
+.lp-ambient {
+  display: none !important;
+}
+
+/* ══════════════════════ surfaces ══════════════════════ */
+
+.lp-eyebrow {
+  font-family: var(--font-sans) !important;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--brass) !important;
+  font-size: 0.72rem;
+}
+
+.lp-sub {
+  color: rgba(230, 213, 174, 0.6) !important;
+  font-family: var(--font-sans);
+}
+
+/* The day base. Used for anything administrative or read at length — a
+   courtyard at 11am rather than standing outside the door. Two-pixel ink
+   borders, no shadows. */
+.havan-day {
+  background: var(--sand) !important;
+  color: var(--ink) !important;
+}
+
+.havan-day .lp-h2,
+.havan-day h2,
+.havan-day h3 {
+  color: var(--ink) !important;
+}
+
+.havan-day .havan-card {
+  background: var(--sand) !important;
+  border: 2px solid var(--ink) !important;
+}
+
+/* ── state language ── */
+.havan-state-gated { color: var(--chrome); }
+.havan-state-vouched { color: var(--verdigris); }
+.havan-state-going { color: var(--brass); }
+.havan-state-live { color: var(--rani); }
+.havan-state-full { color: var(--chrome); }
+
+/* ══════════════════════ motion ══════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .havan-stepwell {
+    background-image: none;
+  }
+}

@@ -1,0 +1,9 @@
+-- Intentionally empty.
+--
+-- `supabase migration new enable_realtime` generated this stub with its own
+-- timestamp while the actual work was written to
+-- 20260915141207_enable_realtime.sql. By the time that was noticed both files had
+-- already been applied to the linked project, so this one stays as a no-op:
+-- deleting it would leave the local migration history out of step with remote.
+--
+-- The Realtime publication changes live in 20260915141207_enable_realtime.sql.

@@ -1,0 +1,27 @@
+{
+  "name": "havan-studio",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 3001 --host",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "node server.js",
+    "verify": "node scripts/verify.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.116.0",
+    "canvas-confetti": "^1.9.4",
+    "express": "^4.21.0",
+    "lucide-react": "^1.16.0",
+    "qrcode": "1.5.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "25.0.1",
+    "vite": "^6.2.0"
+  }
+}
