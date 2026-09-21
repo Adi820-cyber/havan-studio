@@ -29,9 +29,14 @@ const REQUIRED = [
 
 const missing = REQUIRED.filter((k) => !process.env[k]);
 if (missing.length) {
-  console.error(`\n❌  Missing required environment variables:\n`);
-  missing.forEach((k) => console.error(`   • ${k}`));
-  console.error('\n   Create a .env.local file in backend/ with these keys.\n');
+  const msg = `Missing required environment variables: ${missing.join(', ')}. ` +
+    'Set them in Vercel Dashboard → Settings → Environment Variables, or in backend/.env.local for local dev.';
+  console.error(`\n❌  ${msg}\n`);
+  // On Vercel, process.exit kills the function silently. Throw instead so
+  // the error message reaches the client via the error handler.
+  if (process.env.VERCEL) {
+    throw new Error(msg);
+  }
   process.exit(1);
 }
 
