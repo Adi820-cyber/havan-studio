@@ -506,43 +506,48 @@ export const api = {
 
   /* ---------- cover artwork ---------- */
 
-  /**
-   * Uploads a host's own artwork and returns a public URL for it.
-   *
-   * The path is `<uid>/<random>.jpg` because the storage policy checks that the
-   * first folder segment equals auth.uid() — that is what stops one host writing
-   * into another's folder or overwriting their cover. Anonymous guest sessions
-   * are refused by the same policy, so a guest who is only replying to an invite
-   * cannot use the bucket as free image hosting.
-   *
-   * The blob is already downscaled and re-encoded by prepareCoverImage().
-   */
   async uploadCover(blob) {
     const { data: sessionData } = await supabase.auth.getSession();
-    const user = sessionData?.session?.user;
+    const session = sessionData?.session;
+    const user = session?.user;
+    
     if (!user || user.is_anonymous) {
       throw new Error('Create a free account to upload your own artwork.');
     }
 
-    const rand =
-      globalThis.crypto?.randomUUID?.() ??
-      `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const path = `${user.id}/${rand}.jpg`;
-
-    const { error } = await supabase.storage.from('event-covers').upload(path, blob, {
-      contentType: 'image/jpeg',
-      cacheControl: '31536000',
-      upsert: false
-    });
-    if (error) {
-      if (/Bucket not found/i.test(error.message || '')) {
-        throw new Error('Image uploads are not set up on this project yet. Run the latest migration.');
+    try {
+      // 1. Get Presigned URL from our backend
+      const res = await fetch('/api/s3-presigned-url?contentType=image/jpeg', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+      
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to get upload authorization.');
       }
+      
+      const { signedUrl, publicUrl } = await res.json();
+
+      // 2. Upload directly to AWS S3 using the presigned URL
+      const uploadRes = await fetch(signedUrl, {
+        method: 'PUT',
+        body: blob,
+        headers: {
+          'Content-Type': 'image/jpeg'
+        }
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error('Failed to upload image to S3.');
+      }
+
+      // 3. Return the public URL
+      return publicUrl;
+    } catch (error) {
       throw new Error(friendlyError(error, 'Could not upload that image.'));
     }
-
-    const { data } = supabase.storage.from('event-covers').getPublicUrl(path);
-    return data.publicUrl;
   },
 
   /* ---------- profiles ---------- */

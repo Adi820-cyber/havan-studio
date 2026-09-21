@@ -4,15 +4,18 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port 3001 --host",
+    "dev": "concurrently \"nodemon server.js\" \"vite --port 3001 --host\"",
     "build": "vite build",
     "preview": "vite preview",
     "start": "node server.js",
     "verify": "node scripts/verify.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1136.0",
+    "@aws-sdk/s3-request-presigner": "^3.1136.0",
     "@supabase/supabase-js": "2.116.0",
     "canvas-confetti": "^1.9.4",
+    "dotenv": "^18.0.1",
     "express": "^4.21.0",
     "lucide-react": "^1.16.0",
     "qrcode": "1.5.4",
@@ -21,7 +24,9 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.2.4",
     "jsdom": "25.0.1",
+    "nodemon": "^3.1.14",
     "vite": "^6.2.0"
   }
 }
