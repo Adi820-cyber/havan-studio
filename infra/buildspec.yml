@@ -1,0 +1,61 @@
+# ─── HAVAN Studio — AWS CodeBuild Specification (Native Node.js / Git CI/CD) ───
+#
+# Builds frontend static assets and prepares backend code for direct service deployment
+# without Docker container overhead.
+#
+# Environment Variables:
+#   S3_FRONTEND_BUCKET, CLOUDFRONT_DISTRIBUTION_ID, VITE_API_BASE_URL
+
+version: 0.2
+
+env:
+  variables:
+    NODE_ENV: "production"
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+    commands:
+      - echo "Installing dependencies..."
+      - npm run install:all
+
+  pre_build:
+    commands:
+      - echo "Running code verification tests..."
+      - npm run verify
+
+  build:
+    commands:
+      # ── Build Frontend Static Assets ──
+      - echo "Building frontend static bundle..."
+      - cd frontend
+      - VITE_API_BASE_URL=$VITE_API_BASE_URL npm run build
+      - cd ..
+
+  post_build:
+    commands:
+      # ── Deploy Frontend to S3 + CloudFront (if configured) ──
+      - |
+        if [ -n "$S3_FRONTEND_BUCKET" ]; then
+          echo "Syncing frontend to S3 bucket $S3_FRONTEND_BUCKET..."
+          aws s3 sync frontend/dist/ s3://$S3_FRONTEND_BUCKET/ --delete --cache-control "max-age=31536000,public,immutable"
+          aws s3 cp frontend/dist/index.html s3://$S3_FRONTEND_BUCKET/index.html --cache-control "no-cache,no-store,must-revalidate"
+          if [ -n "$CLOUDFRONT_DISTRIBUTION_ID" ]; then
+            echo "Invalidating CloudFront cache..."
+            aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*"
+          fi
+        fi
+
+artifacts:
+  files:
+    - frontend/dist/**/*
+    - backend/**/*
+    - package.json
+    - vercel.json
+
+cache:
+  paths:
+    - '/root/.npm/**/*'
+    - 'frontend/node_modules/**/*'
+    - 'backend/node_modules/**/*'

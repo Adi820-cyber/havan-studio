@@ -1,0 +1,252 @@
+/* ============================================================================
+   Card reveals.
+
+   Twelve ways the invitation opens. The host picks one in the studio; the guest
+   sees it fire once, when the card scrolls into view, and never again on that
+   visit.
+
+   Two rules held throughout:
+
+   1. Every reveal is a *threshold*. The direction is explicit that every board
+      was about a door — deco grilles, the Lotus Gate, a stepwell descent, a
+      Stratos Zero's upward-opening door — and that "a party app is the same
+      object: something you are either let into or not". So nothing here bounces,
+      sparkles or pops. Things open, fold, descend, or are cut away.
+
+   2. The animation runs on the wrapper, never on the card's own box. The card
+      keeps its chamfer, its border and its text selection; only the frame around
+      it moves. This is also why the mask-based reveals use `mask-image` rather
+      than clipping children, which would break scroll anchoring.
+
+   `prefers-reduced-motion` collapses all twelve to a plain fade, at the bottom.
+   That is not a lesser experience — a reveal that triggers vestibular symptoms
+   is worse than no reveal.
+   ========================================================================= */
+
+.havan-reveal {
+  /* Idle state before the observer fires. Kept invisible rather than
+     `display:none` so layout is stable and the page does not jump when the
+     reveal starts. */
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+/* Once the animation has run the wrapper must stop owning a transform, or a
+   position:sticky child inside it silently stops sticking. */
+.havan-reveal.is-open {
+  opacity: 1;
+}
+
+.havan-reveal.is-done {
+  animation: none !important;
+  transform: none !important;
+  clip-path: none !important;
+  mask-image: none !important;
+  -webkit-mask-image: none !important;
+  perspective: none !important;
+}
+
+/* ─────────────── 1. gate ───────────────
+   The signature. A cusped Jaipur arch with a deco sunburst over it, opening
+   from the centre. This is the default and the only one the direction actually
+   asks for by name. */
+.havan-reveal--gate.is-open {
+  animation: havan-gate 1100ms cubic-bezier(0.16, 0.84, 0.28, 1) forwards;
+}
+@keyframes havan-gate {
+  0%   { opacity: 0; clip-path: inset(0 50% 0 50%); }
+  100% { opacity: 1; clip-path: inset(0 0 0 0); }
+}
+
+/* ─────────────── 2. book ───────────────
+   Two pages turning apart on a spine. The card arrives edge-on and rotates flat,
+   which reads as an object rather than a panel. */
+.havan-reveal--book {
+  perspective: 1800px;
+  transform-style: preserve-3d;
+}
+.havan-reveal--book.is-open {
+  animation: havan-book 1200ms cubic-bezier(0.22, 0.75, 0.3, 1) forwards;
+  transform-origin: left center;
+}
+@keyframes havan-book {
+  0%   { opacity: 0; transform: rotateY(-88deg); }
+  60%  { opacity: 1; }
+  100% { opacity: 1; transform: rotateY(0deg); }
+}
+
+/* ─────────────── 3. envelope ───────────────
+   The flap falls forward and the card lifts out of it. */
+.havan-reveal--envelope {
+  perspective: 1400px;
+}
+.havan-reveal--envelope.is-open {
+  animation: havan-envelope 1150ms cubic-bezier(0.2, 0.8, 0.25, 1) forwards;
+  transform-origin: center top;
+}
+@keyframes havan-envelope {
+  0%   { opacity: 0; transform: rotateX(-72deg) translateY(28px); }
+  70%  { opacity: 1; transform: rotateX(6deg) translateY(0); }
+  100% { opacity: 1; transform: rotateX(0deg); }
+}
+
+/* ─────────────── 4. stepwell ───────────────
+   A descent. The card is revealed in stepped bands, top to bottom, the way you
+   read your way down Pana Meena ka Kund. */
+.havan-reveal--stepwell.is-open {
+  animation: havan-stepwell 1250ms steps(9, end) forwards;
+}
+@keyframes havan-stepwell {
+  0%   { opacity: 1; clip-path: inset(0 0 100% 0); }
+  100% { opacity: 1; clip-path: inset(0 0 0 0); }
+}
+
+/* ─────────────── 5. facet ───────────────
+   Cubist. Overlapping translucent planes resolving into one image — the card
+   arrives slightly rotated and off-plane and settles square. */
+.havan-reveal--facet {
+  perspective: 1600px;
+}
+.havan-reveal--facet.is-open {
+  animation: havan-facet 1100ms cubic-bezier(0.18, 0.86, 0.3, 1) forwards;
+}
+@keyframes havan-facet {
+  0%   { opacity: 0; transform: rotate3d(1, -1, 0.2, 22deg) scale(0.92); filter: blur(6px); }
+  100% { opacity: 1; transform: rotate3d(0, 0, 0, 0deg) scale(1); filter: blur(0); }
+}
+
+/* ─────────────── 6. curtain ───────────────
+   A theatre drop. Top-down, weighted, with the slight overshoot of fabric. */
+.havan-reveal--curtain.is-open {
+  animation: havan-curtain 1000ms cubic-bezier(0.34, 1.16, 0.4, 1) forwards;
+  transform-origin: center top;
+}
+@keyframes havan-curtain {
+  0%   { opacity: 0; transform: scaleY(0.04); }
+  100% { opacity: 1; transform: scaleY(1); }
+}
+
+/* ─────────────── 7. wedge ───────────────
+   The Stratos Zero door: up and sideways along the diagonal, chamfer-first. */
+.havan-reveal--wedge.is-open {
+  animation: havan-wedge 950ms cubic-bezier(0.2, 0.8, 0.22, 1) forwards;
+}
+@keyframes havan-wedge {
+  0%   { opacity: 0; clip-path: polygon(0 100%, 0 100%, 0 100%, 0 100%); transform: translateY(20px); }
+  100% { opacity: 1; clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); transform: translateY(0); }
+}
+
+/* ─────────────── 8. blinds ───────────────
+   Deco grille. Horizontal slats opening together, drawn as a repeating mask so
+   the card itself is untouched. */
+.havan-reveal--blinds.is-open {
+  animation: havan-blinds 1150ms cubic-bezier(0.3, 0.75, 0.3, 1) forwards;
+  -webkit-mask-image: repeating-linear-gradient(to bottom, #000 0 12.5%, transparent 12.5% 25%);
+  mask-image: repeating-linear-gradient(to bottom, #000 0 12.5%, transparent 12.5% 25%);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+@keyframes havan-blinds {
+  0% {
+    opacity: 0;
+    -webkit-mask-image: repeating-linear-gradient(to bottom, #000 0 0.5%, transparent 0.5% 25%);
+    mask-image: repeating-linear-gradient(to bottom, #000 0 0.5%, transparent 0.5% 25%);
+  }
+  100% {
+    opacity: 1;
+    -webkit-mask-image: repeating-linear-gradient(to bottom, #000 0 25%, transparent 25% 25%);
+    mask-image: repeating-linear-gradient(to bottom, #000 0 25%, transparent 25% 25%);
+  }
+}
+
+/* ─────────────── 9. iris ───────────────
+   A shutter. Circular, from the centre, the way a lens opens. */
+.havan-reveal--iris.is-open {
+  animation: havan-iris 1050ms cubic-bezier(0.2, 0.82, 0.25, 1) forwards;
+}
+@keyframes havan-iris {
+  0%   { opacity: 0; clip-path: circle(4% at 50% 50%); }
+  100% { opacity: 1; clip-path: circle(85% at 50% 50%); }
+}
+
+/* ─────────────── 10. unfold ───────────────
+   A letter opening out along its horizontal crease. */
+.havan-reveal--unfold {
+  perspective: 1500px;
+}
+.havan-reveal--unfold.is-open {
+  animation: havan-unfold 1200ms cubic-bezier(0.24, 0.8, 0.3, 1) forwards;
+  transform-origin: center center;
+}
+@keyframes havan-unfold {
+  0%   { opacity: 0; transform: rotateX(78deg) scaleY(0.4); }
+  55%  { opacity: 1; transform: rotateX(-8deg) scaleY(1); }
+  100% { opacity: 1; transform: rotateX(0deg) scaleY(1); }
+}
+
+/* ─────────────── 11. marquee ───────────────
+   A cinema hoarding lighting up: the card arrives as a thin horizontal band
+   across the middle, then opens vertically. */
+.havan-reveal--marquee.is-open {
+  animation: havan-marquee 1100ms cubic-bezier(0.2, 0.85, 0.25, 1) forwards;
+}
+@keyframes havan-marquee {
+  0%   { opacity: 0; clip-path: inset(48% 0 48% 0); }
+  45%  { opacity: 1; clip-path: inset(44% 0 44% 0); }
+  100% { opacity: 1; clip-path: inset(0 0 0 0); }
+}
+
+/* ─────────────── 12. dissolve ───────────────
+   The quiet one. A slow diagonal wipe with a soft edge — for a mehfil, where a
+   door slamming open would be the wrong register entirely. */
+.havan-reveal--dissolve.is-open {
+  animation: havan-dissolve 1400ms ease-out forwards;
+}
+@keyframes havan-dissolve {
+  0% {
+    opacity: 0;
+    -webkit-mask-image: linear-gradient(115deg, #000 0%, #000 0%, transparent 18%, transparent 100%);
+    mask-image: linear-gradient(115deg, #000 0%, #000 0%, transparent 18%, transparent 100%);
+  }
+  100% {
+    opacity: 1;
+    -webkit-mask-image: linear-gradient(115deg, #000 0%, #000 140%, transparent 158%, transparent 200%);
+    mask-image: linear-gradient(115deg, #000 0%, #000 140%, transparent 158%, transparent 200%);
+  }
+}
+
+/* ─────────────── the glow behind the gate ───────────────
+   The one gradient the direction permits. Warm light behind the door, fading as
+   the card settles. */
+.havan-reveal-glow {
+  position: absolute;
+  inset: -12%;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, rgba(192, 146, 46, 0.5) 0%, transparent 62%);
+}
+.havan-reveal.is-open .havan-reveal-glow {
+  animation: havan-glow 1500ms ease-out forwards;
+}
+@keyframes havan-glow {
+  0%   { opacity: 0.9; }
+  100% { opacity: 0; }
+}
+
+/* ─────────────── reduced motion ───────────────
+   One fade, no transforms, no masks. */
+@media (prefers-reduced-motion: reduce) {
+  .havan-reveal.is-open,
+  .havan-reveal.is-open .havan-reveal-glow {
+    animation: havan-plain-fade 260ms ease-out forwards !important;
+    transform: none !important;
+    clip-path: none !important;
+    -webkit-mask-image: none !important;
+    mask-image: none !important;
+    perspective: none !important;
+  }
+  @keyframes havan-plain-fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+}
