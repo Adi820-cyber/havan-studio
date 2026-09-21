@@ -122,16 +122,20 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
       }}
     >
       <div
+        className="custom-scrollbar"
         style={{
           width: '100%',
-          maxWidth: '460px',
-          background: 'rgba(15, 19, 32, 0.95)',
-          border: '1px solid rgba(255, 255, 255, 0.14)',
-          borderRadius: '28px',
-          boxShadow: '0 25px 70px rgba(0, 0, 0, 0.9), 0 0 35px rgba(255, 64, 125, 0.15)',
-          padding: '32px',
+          maxWidth: '480px',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          background: 'rgba(15, 19, 32, 0.96)',
+          border: '1px solid rgba(255, 255, 255, 0.16)',
+          borderRadius: '24px',
+          boxShadow: '0 25px 70px rgba(0, 0, 0, 0.9), 0 0 35px rgba(255, 64, 125, 0.18)',
+          padding: '28px 24px',
           position: 'relative',
-          animation: 'modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+          animation: 'modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+          boxSizing: 'border-box'
         }}
       >
         {/* Close Button */}
@@ -367,15 +371,15 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
               <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'rgba(255, 255, 255, 0.7)', marginBottom: '6px' }}>
                 Pick an Avatar
               </label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(44px, 1fr))', gap: '8px' }}>
                 {avatarOptions.map(url => (
                   <button
                     key={url}
                     type="button"
                     onClick={() => setAvatar(url)}
                     style={{
-                      width: 48,
-                      height: 48,
+                      width: 44,
+                      height: 44,
                       borderRadius: '50%',
                       padding: 0,
                       background: 'rgba(255, 255, 255, 0.05)',
@@ -385,7 +389,8 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
                       transition: 'all 0.2s',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      boxShadow: avatar === url ? '0 0 12px rgba(255, 64, 125, 0.5)' : 'none'
                     }}
                   >
                     <img src={url} alt="Avatar option" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />

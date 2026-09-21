@@ -101,7 +101,13 @@ async function request(path, options = {}) {
 
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
-    const err = new Error(errorData.error || `Request failed with status ${res.status}`);
+    let defaultMsg = `Request failed with status ${res.status}`;
+    if (res.status === 404) {
+      defaultMsg = 'Backend API endpoint not found (404). Please ensure the backend server is running or configure VITE_API_BASE_URL to your active backend API.';
+    } else if (res.status === 503 || res.status === 502) {
+      defaultMsg = 'Backend API server is currently unavailable (502/503). Please try again in a moment.';
+    }
+    const err = new Error(errorData.error || defaultMsg);
     err.status = res.status;
     throw err;
   }
