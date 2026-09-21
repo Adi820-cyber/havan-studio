@@ -23,7 +23,6 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const REQUIRED = [
   'SUPABASE_URL',
-  'SUPABASE_SERVICE_ROLE_KEY',
   'SUPABASE_ANON_KEY',
 ];
 
@@ -65,8 +64,9 @@ const env = {
 
   // Supabase
   SUPABASE_URL: process.env.SUPABASE_URL,
-  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY,
   SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
+  HAS_SERVICE_ROLE_KEY: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
 
   // AWS S3 (optional — may be empty strings)
   AWS_CONFIGURED: awsConfigured,

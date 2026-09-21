@@ -45,7 +45,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://vercel.live"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://api.fontshare.com"],
         fontSrc: ["'self'", "data:", "https://fonts.gstatic.com", "https://cdn.fontshare.com"],
         imgSrc: ["'self'", "data:", "blob:", "https:"],
