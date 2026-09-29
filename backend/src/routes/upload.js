@@ -40,7 +40,7 @@ async function getS3Client() {
 
 /**
  * GET /api/upload/presigned-url
- * Query: ?contentType=image/jpeg (optional)
+ * Query: ?contentType=image/jpeg&contentLength=<bytes>
  * Returns: { signedUrl, publicUrl }
  */
 router.get(
@@ -67,6 +67,16 @@ router.get(
     if (typeof contentType !== 'string' || contentType !== 'image/jpeg') {
       return res.status(415).json({ error: 'Only JPEG image uploads are supported.' });
     }
+
+    const contentLengthValue = req.query.contentLength;
+    const contentLength = typeof contentLengthValue === 'string' && /^\d+$/.test(contentLengthValue)
+      ? Number(contentLengthValue)
+      : NaN;
+    const maxUploadBytes = 8 * 1024 * 1024;
+    if (!Number.isSafeInteger(contentLength) || contentLength < 1 || contentLength > maxUploadBytes) {
+      return res.status(413).json({ error: 'Images must be between 1 byte and 8 MB.' });
+    }
+
     const rand = crypto.randomUUID();
     const objectKey = `${req.user.id}/${rand}.jpg`;
 
@@ -74,11 +84,17 @@ router.get(
       Bucket: env.AWS_S3_BUCKET,
       Key: objectKey,
       ContentType: contentType,
+      ContentLength: contentLength,
       CacheControl: 'max-age=31536000',
     });
 
     // URL valid for 2 minutes
-    const signedUrl = await getSignedUrl(s3, command, { expiresIn: 120 });
+    const signedUrl = await getSignedUrl(s3, command, {
+      expiresIn: 120,
+      // Bind the upload to this exact MIME type and byte count. Browsers add
+      // Content-Length for Blob PUT requests, and S3 rejects a mismatch.
+      signableHeaders: new Set(['content-length', 'content-type']),
+    });
     const publicUrl = `https://${env.AWS_S3_BUCKET}.s3.${env.AWS_REGION}.amazonaws.com/${objectKey}`;
 
     console.log(`✅ Presigned URL generated for user ${req.user.id.slice(0, 8)}...`);

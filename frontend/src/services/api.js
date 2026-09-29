@@ -548,7 +548,11 @@ export const api = {
     }
 
     // 1. Get presigned URL from backend
-    const { signedUrl, publicUrl } = await request('/api/upload/presigned-url?contentType=image/jpeg');
+    const uploadParams = new URLSearchParams({
+      contentType: 'image/jpeg',
+      contentLength: String(blob.size),
+    });
+    const { signedUrl, publicUrl } = await request(`/api/upload/presigned-url?${uploadParams}`);
 
     // 2. Upload directly to S3
     const uploadRes = await fetch(signedUrl, {
