@@ -223,6 +223,16 @@ function _notifyAuthListeners(user) {
 }
 
 export const api = {
+  /* ---------- feedback ---------- */
+
+  async submitFeedback(input) {
+    await request('/api/feedback', {
+      method: 'POST',
+      auth: false,
+      body: input,
+    });
+  },
+
   /* ---------- session ---------- */
 
   async getCurrentUser() {

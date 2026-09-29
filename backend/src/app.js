@@ -25,6 +25,7 @@ import inviteeRoutes from './routes/invitees.js';
 import sseRoutes from './routes/sse.js';
 import dashboardRoutes from './routes/dashboard.js';
 import healthRoutes from './routes/health.js';
+import feedbackRoutes from './routes/feedback.js';
 
 const app = express();
 
@@ -32,7 +33,15 @@ const app = express();
 // Strips tech-stack headers (Server, X-Powered-By), adds request ID,
 // sets COOP/CORP, Permissions-Policy, Referrer-Policy, X-Frame-Options.
 app.disable('x-powered-by');
-app.set('trust proxy', true); // Behind ALB/CloudFront/Vercel
+// `1` trusts exactly one proxy hop in front of this process — Vercel's edge,
+// or a single ALB/CloudFront hop on AWS — and reads the real client IP from
+// the last entry it added to X-Forwarded-For. `true` (the previous value)
+// trusts the entire header chain, including any hop a client could forge if
+// one ever slipped in ahead of the real proxy; `1` is the portable, correct
+// value for "exactly one reverse proxy between the internet and this app" on
+// either platform. If a future AWS setup adds a second hop (e.g. CloudFront
+// in front of an ALB), bump this to `2`.
+app.set('trust proxy', 1);
 app.use(securityProxy);
 
 /* ── 2. Helmet — additional hardening ── */
@@ -104,6 +113,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/invitees', inviteeRoutes);
 app.use('/api/sse', sseRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/feedback', feedbackRoutes);
 
 /* ── 404 for unmatched API routes ── */
 app.use('/api/*', (req, res) => {
