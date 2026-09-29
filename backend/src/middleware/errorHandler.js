@@ -44,7 +44,13 @@ export function friendlyError(error, fallback = 'Something went wrong. Please tr
   if (/host cannot rsvp|cannot rsvp.*own/i.test(msg)) {
     return 'You cannot RSVP to your own event.';
   }
-  return msg || fallback;
+  // Anything that didn't match one of the known-safe patterns above falls
+  // through to the generic fallback rather than the raw message. Postgres/
+  // PostgREST errors can carry table names, column names, constraint names,
+  // or query fragments — none of that belongs in a client-facing response.
+  // The real message is still available server-side via the console.error
+  // in errorHandler() below, which is where debugging it should happen.
+  return fallback;
 }
 
 /**

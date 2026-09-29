@@ -1,8 +1,8 @@
 /* ============================================================================
    Card reveals.
 
-   Twelve ways the invitation opens. The host picks one in the studio; the guest
-   sees it fire once, when the card scrolls into view, and never again on that
+   Seventeen ways the invitation reveals itself. The host picks one in the studio;
+   the guest sees it once after opening the note, then it stays settled for that
    visit.
 
    Two rules held throughout:
@@ -18,7 +18,7 @@
       it moves. This is also why the mask-based reveals use `mask-image` rather
       than clipping children, which would break scroll anchoring.
 
-   `prefers-reduced-motion` collapses all twelve to a plain fade, at the bottom.
+   `prefers-reduced-motion` collapses the reveals to a plain fade, at the bottom.
    That is not a lesser experience — a reveal that triggers vestibular symptoms
    is worse than no reveal.
    ========================================================================= */
@@ -235,6 +235,193 @@
 
 /* ─────────────── reduced motion ───────────────
    One fade, no transforms, no masks. */
+.havan-opening {
+  width: 100%;
+  color: var(--opening-text);
+}
+
+/* ─────────────── 15. kathputli ───────────────
+   Two stage curtains part to introduce the invitation. The puppet mark on the
+   cover moves with a short, restrained swing. */
+.havan-reveal--kathputli.is-open {
+  animation: havan-kathputli-reveal 1050ms cubic-bezier(0.2, 0.78, 0.25, 1) forwards;
+}
+@keyframes havan-kathputli-reveal {
+  0% { opacity: 0; clip-path: inset(0 50% 0 50%); }
+  100% { opacity: 1; clip-path: inset(0 0 0 0); }
+}
+
+/* ─────────────── 16. warli circle ───────────────
+   The gathering comes into view from its centre, echoing the circular figures
+   shown in Warli scenes of community dance and gathering. */
+.havan-reveal--warli-circle.is-open {
+  animation: havan-warli-circle 1050ms cubic-bezier(0.18, 0.8, 0.25, 1) forwards;
+}
+@keyframes havan-warli-circle {
+  0% { opacity: 0; clip-path: circle(2% at 50% 50%); }
+  100% { opacity: 1; clip-path: circle(75% at 50% 50%); }
+}
+
+/* ─────────────── 17. madhubani frame ───────────────
+   A soft paper-like wipe follows the drawn botanical frame on the cover. */
+.havan-reveal--madhubani-frame.is-open {
+  animation: havan-madhubani-frame 1150ms ease-out forwards;
+}
+@keyframes havan-madhubani-frame {
+  0% { opacity: 0; clip-path: inset(0 0 100% 0); }
+  100% { opacity: 1; clip-path: inset(0 0 0 0); }
+}
+.havan-opening-cover {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  min-height: 280px;
+  padding: 30px 26px 25px;
+  overflow: hidden;
+  text-align: center;
+  color: var(--opening-text);
+  font: inherit;
+  cursor: pointer;
+  background:
+    radial-gradient(ellipse at 50% 8%, color-mix(in srgb, var(--opening-accent) 25%, transparent), transparent 52%),
+    var(--opening-paper);
+  border: 1px solid color-mix(in srgb, var(--opening-accent) 54%, transparent);
+  clip-path: var(--chamfer-zig);
+}
+.havan-opening-cover::before,
+.havan-opening-cover::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+}
+.havan-opening-cover::before {
+  inset: 12px;
+  border: 1px solid color-mix(in srgb, var(--opening-accent) 25%, transparent);
+  clip-path: var(--chamfer-zig);
+}
+.havan-opening-cover::after {
+  z-index: 1;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 43%;
+  background: linear-gradient(145deg, transparent 49.4%, color-mix(in srgb, var(--opening-primary) 65%, #15182a) 50%),
+    linear-gradient(215deg, transparent 49.4%, color-mix(in srgb, var(--opening-primary) 65%, #15182a) 50%);
+  opacity: 0.32;
+  transition: transform 680ms cubic-bezier(.2,.75,.25,1), opacity 350ms ease;
+}
+.havan-opening-ornament {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 15px;
+  color: var(--opening-accent);
+  border: 1px solid color-mix(in srgb, var(--opening-accent) 48%, transparent);
+  background: color-mix(in srgb, var(--opening-accent) 12%, transparent);
+  clip-path: polygon(50% 0, 89% 16%, 100% 50%, 84% 88%, 50% 100%, 12% 84%, 0 50%, 16% 12%);
+}
+.havan-opening-kicker,
+.havan-opening-sender,
+.havan-opening-message,
+.havan-opening-action { position: relative; z-index: 2; }
+.havan-opening-kicker {
+  color: color-mix(in srgb, var(--opening-text) 60%, transparent);
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.havan-opening-sender {
+  margin-top: 3px;
+  color: var(--opening-accent);
+  font-size: 1.1rem;
+  font-family: var(--font-display);
+}
+.havan-opening-message {
+  max-width: 390px;
+  margin-top: 12px;
+  color: color-mix(in srgb, var(--opening-text) 84%, transparent);
+  font-family: 'Mukta', sans-serif;
+  font-size: .92rem;
+  line-height: 1.55;
+}
+.havan-opening-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 19px;
+  padding: 9px 15px;
+  color: #19140f;
+  background: var(--opening-accent);
+  font-size: .8rem;
+  font-weight: 700;
+}
+.havan-opening-hint {
+  display: block;
+  margin-top: 8px;
+  color: rgba(230,213,174,.44);
+  font-size: .72rem;
+  text-align: center;
+}
+.havan-opening--scroll .havan-opening-cover {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--opening-accent) 32%, #17192b), var(--opening-paper) 11% 89%, color-mix(in srgb, var(--opening-accent) 32%, #17192b));
+}
+.havan-scroll-mark { display: flex; align-items: center; gap: 3px; }
+.havan-scroll-mark i { width: 7px; height: 38px; border-radius: 4px; background: var(--opening-accent); }
+.havan-opening--kathputli .havan-opening-cover::after {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--opening-primary) 74%, #21162a) 0 15%, transparent 15% 85%, color-mix(in srgb, var(--opening-primary) 74%, #21162a) 85% 100%);
+  opacity: .28;
+  transition: transform 680ms cubic-bezier(.2,.75,.25,1), opacity 350ms ease;
+}
+.havan-kathputli { width: 62px; height: 62px; overflow: visible; }
+.havan-kathputli-strings,
+.havan-kathputli-body,
+.havan-kathputli-stage { fill: none; stroke: var(--opening-accent); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.havan-kathputli-head { fill: var(--opening-accent); stroke: var(--opening-text); stroke-width: 1; }
+.havan-kathputli-body { fill: color-mix(in srgb, var(--opening-primary) 52%, transparent); }
+.havan-opening--kathputli.is-opening .havan-kathputli { animation: havan-kathputli-swing 680ms ease-in-out both; transform-origin: 38px 34px; }
+@keyframes havan-kathputli-swing { 0%, 100% { transform: rotate(0); } 35% { transform: rotate(-8deg); } 70% { transform: rotate(5deg); } }
+.havan-warli { width: 62px; height: 62px; overflow: visible; fill: none; stroke: var(--opening-accent); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.havan-warli-ring { stroke-dasharray: 3 3; }
+.havan-warli-dancers { transform-origin: 38px 38px; }
+.havan-opening--warli-circle.is-opening .havan-warli-dancers { animation: havan-warli-dance 680ms ease-out both; }
+@keyframes havan-warli-dance { from { transform: rotate(-22deg) scale(.86); opacity: .55; } to { transform: rotate(0) scale(1); opacity: 1; } }
+.havan-madhubani { width: 62px; height: 62px; overflow: visible; fill: none; stroke: var(--opening-accent); stroke-width: 1.55; stroke-linecap: round; stroke-linejoin: round; }
+.havan-madhubani-petals { stroke-dasharray: 260; stroke-dashoffset: 0; }
+.havan-opening--madhubani-frame.is-opening .havan-madhubani-petals { animation: havan-madhubani-draw 680ms ease-out both; }
+@keyframes havan-madhubani-draw { from { stroke-dashoffset: 260; opacity: .35; } to { stroke-dashoffset: 0; opacity: 1; } }
+.havan-opening--kabutar .havan-opening-cover::after { display: none; }
+.havan-kabutar { width: 55px; overflow: visible; fill: var(--opening-text); }
+.havan-kabutar-letter { fill: none; stroke: var(--opening-accent); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.havan-kabutar-eye { fill: var(--opening-primary); }
+.havan-opening--kabutar.is-opening .havan-kabutar { animation: havan-kabutar 680ms cubic-bezier(.18,.72,.2,1) forwards; }
+.havan-opening.is-opening:not(.havan-opening--scroll):not(.havan-opening--kabutar) .havan-opening-cover::after {
+  transform: translateY(95%) scaleY(.15);
+  opacity: .05;
+}
+.havan-opening--scroll.is-opening .havan-opening-cover { animation: havan-scroll-open 680ms cubic-bezier(.18,.72,.2,1) forwards; transform-origin: center top; }
+.havan-opening-revealed { animation: havan-opening-reveal 520ms ease-out both; }
+@keyframes havan-kabutar { 0% { transform: translate(-35px, 10px) scale(.72); opacity: .3; } 72% { transform: translate(20px, -7px) scale(1.08); opacity: 1; } 100% { transform: translate(44px, -20px) scale(.35); opacity: 0; } }
+@keyframes havan-scroll-open { 0% { clip-path: inset(0 0 0 0); transform: scaleY(.9); } 100% { clip-path: inset(0 0 100% 0); transform: scaleY(1); opacity: .15; } }
+@keyframes havan-opening-reveal { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .havan-opening-cover::after,
+  .havan-opening--kabutar.is-opening .havan-kabutar,
+  .havan-opening--kathputli.is-opening .havan-kathputli,
+  .havan-opening--warli-circle.is-opening .havan-warli-dancers,
+  .havan-opening--madhubani-frame.is-opening .havan-madhubani-petals,
+  .havan-opening--scroll.is-opening .havan-opening-cover,
+  .havan-opening-revealed { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .havan-reveal.is-open,
   .havan-reveal.is-open .havan-reveal-glow {

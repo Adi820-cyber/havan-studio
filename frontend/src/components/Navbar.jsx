@@ -13,7 +13,7 @@ import BrandLogo from './BrandLogo';
  * button, an auth dropdown and a separate mobile drawer. On a laptop those wrapped
  * into each other, which is the overlap that shows in a narrow viewport.
  *
- * Now: brand, two anchors, and the actions a visitor actually needs. The category
+ * Now: brand, a few useful anchors, and the actions a visitor actually needs. The category
  * buttons are gone because the templates section already filters by category and
  * that is where a visitor is looking when they want one.
  *
@@ -27,6 +27,7 @@ export default function Navbar({
   profile,
   onOpenAuth,
   onOpenCheckInvite,
+  onOpenDashboardPanel,
   onOpenProfile,
   onLogout
 }) {
@@ -71,7 +72,20 @@ export default function Navbar({
 
   const goTo = (id) => {
     setMobileOpen(false);
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+    // Dashboard has no landing-page anchor sections. Open the dashboard's
+    // matching panel directly instead of relying on scroll-target detection.
+    if (currentUser) {
+      onOpenDashboardPanel?.(id);
+      return;
+    }
+
+    const target = document.getElementById(id);
+    if (target) {
+      const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      target.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' });
+    } else {
+      onOpenDashboardPanel?.(id);
+    }
   };
 
   const linkStyle = {
@@ -120,7 +134,7 @@ export default function Navbar({
             flexShrink: 0
           }}
         >
-          <BrandLogo size="md" showDevanagari={true} />
+          <BrandLogo size="md" />
         </a>
 
         {/* Desktop links */}
@@ -130,6 +144,9 @@ export default function Navbar({
         >
           <button type="button" style={linkStyle} onClick={() => goTo('templates')}>
             Styles
+          </button>
+          <button type="button" style={linkStyle} onClick={() => goTo('invite-story')}>
+            Try an opening
           </button>
           <button type="button" style={linkStyle} onClick={() => goTo('how-it-works')}>
             How it works
@@ -169,7 +186,12 @@ export default function Navbar({
                   alignItems: 'center'
                 }}
               >
-                <Avatar name={currentUser.name} avatarUrl={profile?.avatarUrl} size={34} />
+                <Avatar
+                  name={profile?.displayName || currentUser.name}
+                  avatar={profile?.avatar}
+                  avatarUrl={profile?.avatarUrl}
+                  size={34}
+                />
               </button>
 
               {userOpen && (
@@ -349,6 +371,9 @@ export default function Navbar({
         >
           <button type="button" style={{ ...linkStyle, padding: '11px 0', textAlign: 'left' }} onClick={() => goTo('templates')}>
             Styles
+          </button>
+          <button type="button" style={{ ...linkStyle, padding: '11px 0', textAlign: 'left' }} onClick={() => goTo('invite-story')}>
+            Try an opening
           </button>
           <button type="button" style={{ ...linkStyle, padding: '11px 0', textAlign: 'left' }} onClick={() => goTo('how-it-works')}>
             How it works

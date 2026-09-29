@@ -22,7 +22,7 @@ import {
  * Four things the host decides here, in the order they matter:
  *   artwork  · their own upload, a suggestion, or the library
  *   type     · the one place the two-face brand rule is relaxed
- *   opening  · one of twelve reveals, fired when the guest scrolls to the card
+ *   opening  · one of seventeen reveals and a personal opening scene
  *   sound    · one of twelve, or none
  */
 export default function VibePicker({
@@ -56,7 +56,12 @@ export default function VibePicker({
   const suggestedIds = useMemo(() => new Set(suggested.map((b) => b.id)), [suggested]);
   const rest = useMemo(() => BACKGROUNDS.filter((b) => !suggestedIds.has(b.id)), [suggestedIds]);
 
-  const suggestedReveals = useMemo(() => recommendReveals(category, 4), [category]);
+  const suggestedReveals = useMemo(() => {
+    const recommended = recommendReveals(category, 4);
+    const selected = REVEALS.find((reveal) => reveal.id === revealId);
+    if (!selected || recommended.some((reveal) => reveal.id === selected.id)) return recommended;
+    return [selected, ...recommended.slice(0, 3)];
+  }, [category, revealId]);
   const suggestedReveals4 = useMemo(
     () => new Set(suggestedReveals.map((r) => r.id)),
     [suggestedReveals]
@@ -388,7 +393,7 @@ export default function VibePicker({
       {sectionHead('How it opens')}
 
       <p style={{ margin: '-6px 0 13px', fontSize: '0.84rem', lineHeight: 1.5, color: 'rgba(230,213,174,0.48)' }}>
-        Plays once, when your guest scrolls to the card. Twelve of them.
+        Choose a style, then tap the invitation preview on the left to play it. Guests see your note before the event details.
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 12 }}>
@@ -397,7 +402,7 @@ export default function VibePicker({
             r.id,
             revealId === r.id,
             r.name,
-            r.note,
+            r.inspiration ? `${r.inspiration} · ${r.note}` : r.note,
             () => onPickReveal(r.id),
             <span
               style={{
@@ -412,7 +417,7 @@ export default function VibePicker({
                 marginTop: 2
               }}
             >
-              Fits
+              {revealId === r.id ? 'Selected' : 'Fits'}
             </span>
           )
         )}
@@ -427,11 +432,18 @@ export default function VibePicker({
             padding: '6px 0'
           }}
         >
-          The other eight
+          The other {otherReveals.length} styles
         </summary>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginTop: 9 }}>
           {otherReveals.map((r) =>
-            optionRow(r.id, revealId === r.id, r.name, r.note, () => onPickReveal(r.id), null)
+            optionRow(
+              r.id,
+              revealId === r.id,
+              r.name,
+              r.inspiration ? `${r.inspiration} · ${r.note}` : r.note,
+              () => onPickReveal(r.id),
+              null
+            )
           )}
         </div>
       </details>

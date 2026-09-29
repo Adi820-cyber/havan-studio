@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import confetti from 'canvas-confetti';
 import {
   Calendar, MapPin, Lock, Unlock, CheckCircle2, Users,
-  Share2, Key, Download, ExternalLink, ArrowLeft, Send, Check, Copy,
-  MessageSquare, Shirt, Hourglass, PackageOpen
+  Share2, Key, ExternalLink, ArrowLeft, Send,
+  MessageSquare, Shirt, Hourglass, PackageOpen, Pencil, Bell, X
 } from 'lucide-react';
 import { playPop, playCelebrationChord, playWhoosh } from '../utils/soundEffects';
 import { api } from '../services/api';
@@ -12,10 +12,14 @@ import { RSVP_ICON } from '../lib/icons';
 import { useLiveEvent, useRefreshOnFocus } from '../hooks/useSSE';
 import SeenHaiReaction from './SeenHaiReaction';
 import HostPanel from './HostPanel';
+import ShareSheet from './ShareSheet';
 import { fontById, revealById, houseRuleLine } from '../data/vibe';
 import RevealOnScroll from './RevealOnScroll';
+import InvitationOpening from './InvitationOpening';
+import InvitationCardMaker from './InvitationCardMaker';
+import { THEME_PALETTES } from '../data/templates';
 
-export default function LiveInviteView({ slug, inviteToken = null, onBackToStudio }) {
+export default function LiveInviteView({ slug, inviteToken = null, onBackToStudio, currentUser }) {
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -47,12 +51,109 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
   const [commentName, setCommentName] = useState('');
   const [isPostingComment, setIsPostingComment] = useState(false);
 
-  // Share Modal & QR
+  // Share sheet — one modal for QR, copy link, WhatsApp and ICS (see ShareSheet.jsx)
   const [isShareOpen, setIsShareOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [updateNotice, setUpdateNotice] = useState('');
+  const lastEventUpdatedAt = useRef(null);
+  const browserAlertsKey = `havan-browser-alerts:${slug}`;
+  const browserAlertNotifiedKey = `havan-browser-alert-notified:${slug}`;
+  const [browserAlertsEnabled, setBrowserAlertsEnabled] = useState(() => {
+    try {
+      return typeof window !== 'undefined'
+        && 'Notification' in window
+        && Notification.permission === 'granted'
+        && localStorage.getItem(browserAlertsKey) === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [browserAlertMessage, setBrowserAlertMessage] = useState('');
 
   const cardRef = useRef(null);
+
+  useEffect(() => {
+    try {
+      setBrowserAlertsEnabled(
+        'Notification' in window
+        && Notification.permission === 'granted'
+        && localStorage.getItem(browserAlertsKey) === 'true'
+      );
+    } catch {
+      setBrowserAlertsEnabled(false);
+    }
+  }, [browserAlertsKey]);
+
+  const notifyEventUpdate = useCallback((invite) => {
+    try {
+      if (!('Notification' in window) || !('serviceWorker' in navigator)
+        || Notification.permission !== 'granted'
+        || localStorage.getItem(browserAlertsKey) !== 'true') return;
+
+      const updatedAt = invite?.updatedAt?.getTime?.() || new Date(invite?.updatedAt || 0).getTime();
+      const lastNotifiedAt = Number(localStorage.getItem(browserAlertNotifiedKey) || 0);
+      if (!updatedAt || updatedAt <= lastNotifiedAt) return;
+      localStorage.setItem(browserAlertNotifiedKey, String(updatedAt));
+
+      navigator.serviceWorker.ready
+        .then((registration) => registration.showNotification(`${invite.title || 'Your event'} was updated`, {
+          body: invite.updateMessage || 'The host changed the invitation. Tap to see the latest details.',
+          tag: `havan-event-update:${slug}`,
+          data: { url: window.location.href }
+        }))
+        .catch(() => {
+          if (localStorage.getItem(browserAlertNotifiedKey) === String(updatedAt)) {
+            localStorage.removeItem(browserAlertNotifiedKey);
+          }
+        });
+    } catch {
+      // Browser storage or notification APIs may be unavailable in private mode.
+    }
+  }, [browserAlertsKey, browserAlertNotifiedKey, slug]);
+
+  const toggleBrowserAlerts = async () => {
+    if (browserAlertsEnabled) {
+      try {
+        localStorage.removeItem(browserAlertsKey);
+        setBrowserAlertsEnabled(false);
+        setBrowserAlertMessage('Browser alerts are off for this invitation.');
+      } catch {
+        setBrowserAlertMessage('Could not change browser alert settings.');
+      }
+      return;
+    }
+
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+      setBrowserAlertMessage('This browser does not support invitation alerts.');
+      return;
+    }
+
+    try {
+      const permission = Notification.permission === 'granted'
+        ? 'granted'
+        : await Notification.requestPermission();
+      if (permission !== 'granted') {
+        setBrowserAlertMessage(permission === 'denied'
+          ? 'Alerts are blocked in browser settings.'
+          : 'Alerts were not enabled.');
+        return;
+      }
+
+      await navigator.serviceWorker.register('/sw.js');
+      const registration = await navigator.serviceWorker.ready;
+      localStorage.setItem(browserAlertsKey, 'true');
+      setBrowserAlertsEnabled(true);
+      setBrowserAlertMessage('Alerts are on. Keep this invitation open in your browser for live updates.');
+      await registration.showNotification('HAVAN alerts are on', {
+        body: 'We’ll let you know if the host changes this invitation.',
+        tag: `havan-alerts-enabled:${slug}`,
+        data: { url: window.location.href }
+      });
+    } catch {
+      setBrowserAlertMessage('Could not enable alerts in this browser. Please try again.');
+    }
+  };
 
   /**
    * Loads the invitation.
@@ -75,6 +176,19 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
       }
 
       setEvent(invite);
+      const updatedAt = invite.updatedAt?.getTime?.() || 0;
+      const createdAt = invite.createdAt ? new Date(invite.createdAt).getTime() : 0;
+      const previousUpdatedAt = lastEventUpdatedAt.current;
+      if (!invite.isHost && previousUpdatedAt && updatedAt > previousUpdatedAt) {
+        setUpdateNotice(invite.updateMessage || 'The host updated this invitation. Please check the latest details.');
+      } else if (!invite.isHost && !previousUpdatedAt && updatedAt > createdAt) {
+        const dismissedAt = Number(localStorage.getItem(`havan-update-seen:${slug}`) || 0);
+        if (updatedAt > dismissedAt) {
+          setUpdateNotice(invite.updateMessage || 'The host updated this invitation. Please check the latest details.');
+          notifyEventUpdate(invite);
+        }
+      }
+      lastEventUpdatedAt.current = updatedAt;
       // On a private invite, greet them with the name the host wrote down.
       if (invite.invitedAs && !invite.myRsvp) setGuestName(invite.invitedAs);
       if (invite.myRsvp) {
@@ -85,9 +199,10 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
         setGuestContact(invite.myRsvp.contact || '');
       }
 
-      // The wall is only readable once you've replied, so an empty list here is
-      // an expected state rather than an error.
-      setComments(await api.getComments(slug));
+      // The wall is only readable once you've replied. A first-time visitor is
+      // expected to get an empty wall, and an auth/session hiccup must never
+      // prevent the invitation itself from opening.
+      try { setComments(await api.getComments(slug)); } catch { setComments([]); }
       setQrCodeUrl(await api.qrDataUrl(slug));
     } catch (err) {
       setError(err.message || 'Failed to load this invitation');
@@ -111,16 +226,22 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
    */
   const refreshQuietly = useCallback(async () => {
     try {
-      const [invite, notes] = await Promise.all([
-        api.getInvite(slug, inviteToken),
-        api.getComments(slug)
-      ]);
-      if (invite) setEvent(invite);
+      const invite = await api.getInvite(slug, inviteToken);
+      const notes = await api.getComments(slug).catch(() => comments);
+      if (invite) {
+        const updatedAt = invite.updatedAt?.getTime?.() || 0;
+        if (!invite.isHost && lastEventUpdatedAt.current && updatedAt > lastEventUpdatedAt.current) {
+          setUpdateNotice(invite.updateMessage || 'The host updated this invitation. Please check the latest details.');
+          notifyEventUpdate(invite);
+        }
+        lastEventUpdatedAt.current = updatedAt;
+        setEvent(invite);
+      }
       setComments(notes);
     } catch {
       // A failed background refresh should never disturb what is on screen.
     }
-  }, [slug, inviteToken]);
+  }, [slug, inviteToken, comments, notifyEventUpdate]);
 
   // Live: someone replied or left a note on this event.
   // The scope keeps this channel distinct from the host panel's, which watches
@@ -128,10 +249,6 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
   useLiveEvent(event?.id, refreshQuietly, 'invite-view');
   // Safety net for a websocket that dropped while the tab was asleep.
   useRefreshOnFocus(refreshQuietly);
-
-
-
-
 
   // Tapping one of the three Seen Hai replies
   const handleRsvpOptionClick = (statusKey) => {
@@ -247,31 +364,6 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
     }
   };
 
-  // Download .ics Calendar File
-  // Built from the event's real start time. Previously every exported file
-  // carried a hardcoded DTSTART of 2026-11-14.
-  const downloadCalendarFile = () => {
-    if (!event) return;
-    const blob = api.icsBlob(event);
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `${(event.title || 'invitation').toLowerCase().replace(/[^a-z0-9]/g, '-')}.ics`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-  };
-
-  const copyShareUrl = () => {
-    navigator.clipboard.writeText(api.inviteUrl(slug)).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
-
-  const getWhatsAppShareUrl = () => api.whatsAppUrl(event);
-
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#080a12' }}>
@@ -326,6 +418,24 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
 
   const cardFont = fontById(custom.fontId);
   const reveal = revealById(custom.revealId);
+  const inviteTheme = THEME_PALETTES.find((palette) => palette.id === event.theme?.presetId) || THEME_PALETTES[0];
+
+  const dismissUpdateNotice = () => {
+    setUpdateNotice('');
+    if (event.updatedAt) localStorage.setItem(`havan-update-seen:${slug}`, String(event.updatedAt.getTime()));
+  };
+
+  if (isEditing && event) {
+    return (
+      <InvitationCardMaker
+        key={`edit-${event.slug}`}
+        initialCategory={event.customization?.category || 'all'}
+        initialEvent={event}
+        currentUser={currentUser}
+        onBack={() => { setIsEditing(false); loadEvent(); }}
+      />
+    );
+  }
 
   // Replies close before the gathering starts, and the database enforces it. The
   // guest was never told: the buttons stayed live and the refusal only arrived
@@ -349,11 +459,20 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
     : '';
 
   return (
-    <div style={{ position: 'relative', minHeight: '100vh', background: 'var(--indigo-deep)', color: '#fff', overflowX: 'hidden', paddingBottom: 60 }}>
+    <div style={{
+      position: 'relative', minHeight: '100vh', background: inviteTheme.bg,
+      color: inviteTheme.textColor, overflowX: 'hidden', paddingBottom: 60,
+      '--invite-primary': inviteTheme.primary,
+      '--invite-accent': inviteTheme.accent,
+      '--invite-card': inviteTheme.cardBg,
+      '--invite-border': inviteTheme.border,
+      '--invite-muted': inviteTheme.textColorMuted
+    }}>
       <div className="lp-grain" aria-hidden="true" />
 
       {/* Sticky Floating Action Nav */}
       <div
+        className="havan-invite-nav"
         style={{
           position: 'sticky',
           top: 0,
@@ -368,6 +487,7 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
         }}
       >
         <button
+          className="havan-invite-back"
           onClick={onBackToStudio}
           style={{
             background: 'rgba(255, 255, 255, 0.06)',
@@ -386,13 +506,46 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
           <span>Invite Studio</span>
         </button>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button
+        <div className="havan-invite-nav-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {!event.isHost && 'Notification' in window && 'serviceWorker' in navigator && (
+            <button
+              className="havan-browser-alert-toggle"
+              type="button"
+              onClick={toggleBrowserAlerts}
+              aria-pressed={browserAlertsEnabled}
+              aria-label={browserAlertsEnabled ? 'Turn off browser alerts for this invitation' : 'Get browser alerts when this invitation changes'}
+              title={browserAlertsEnabled ? 'Turn off browser alerts for this invitation' : 'Get browser alerts when this invitation changes'}
+              style={{
+                background: browserAlertsEnabled ? `${inviteTheme.primary}22` : 'rgba(255,255,255,0.06)',
+                border: `1px solid ${browserAlertsEnabled ? inviteTheme.primary : 'var(--invite-border)'}`,
+                color: inviteTheme.textColor, borderRadius: 999, padding: '6px 12px',
+                fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer'
+              }}
+            >
+              <Bell size={14} />
+              <span>{browserAlertsEnabled ? 'Alerts on' : 'Get alerts'}</span>
+            </button>
+          )}
+          {event.isHost && (
+            <button
+              type="button"
+              onClick={() => setIsEditing(true)}
+              style={{
+                background: 'rgba(255,255,255,0.06)', border: '1px solid var(--invite-border)',
+                color: inviteTheme.textColor, borderRadius: 999, padding: '6px 14px',
+                fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer'
+              }}
+            >
+              <Pencil size={14} />
+              <span>Edit event</span>
+            </button>
+          )}
+          {!event.isPrivate && <button
             onClick={() => setIsShareOpen(true)}
             style={{
               background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              color: '#fff',
+              border: '1px solid var(--invite-border)',
+              color: inviteTheme.textColor,
               borderRadius: 999,
               padding: '6px 14px',
               fontSize: '0.8rem',
@@ -405,8 +558,33 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
             <Share2 size={14} />
             <span>Share</span>
           </button>
+          }
         </div>
       </div>
+
+      {browserAlertMessage && (
+        <div role="status" style={{ maxWidth: 1068, margin: '10px auto 0', padding: '0 16px', color: inviteTheme.textColorMuted, fontSize: '0.78rem' }}>
+          {browserAlertMessage}
+        </div>
+      )}
+
+      {updateNotice && (
+        <div
+          role="status"
+          style={{
+            maxWidth: 1068, margin: '14px auto 0', padding: '12px 15px',
+            display: 'flex', alignItems: 'flex-start', gap: 10,
+            color: inviteTheme.textColor, background: inviteTheme.cardBg,
+            border: `1px solid ${inviteTheme.primary}77`, clipPath: 'var(--chamfer-sm)'
+          }}
+        >
+          <Bell size={16} color={inviteTheme.primary} style={{ flexShrink: 0, marginTop: 2 }} />
+          <span style={{ flex: 1, fontSize: '0.86rem', lineHeight: 1.45 }}>{updateNotice}</span>
+          <button type="button" onClick={dismissUpdateNotice} aria-label="Dismiss event update" style={{ border: 0, background: 'transparent', color: inviteTheme.textColorMuted, cursor: 'pointer' }}>
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       {/* Main content — side-by-side on desktop, stacked on mobile */}
       <main style={{
@@ -421,19 +599,21 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
         alignItems: 'flex-start',
         justifyContent: 'center'
       }}>
-        
+
         {/* Left Column: Card */}
         <div style={{ flex: '1 1 400px', maxWidth: 520, width: '100%' }}>
           {/* The invitation, opening the way the host chose. The reveal lives on
               the wrapper so the card keeps its chamfer, borders and selection. */}
+          <InvitationOpening key={reveal.id} event={event} theme={inviteTheme}>
           <RevealOnScroll revealId={reveal.id}>
         <div
           ref={cardRef}
           className="havan-card"
           style={{
             overflow: 'hidden',
-            border: '1px solid rgba(230, 213, 174, 0.18)',
-            background: 'var(--indigo)'
+            border: `1px solid ${inviteTheme.border}`,
+            background: inviteTheme.cardBg,
+            color: inviteTheme.textColor
           }}
         >
           {/* Artwork Stage */}
@@ -473,7 +653,7 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
 
             {/* Title & Host on Artwork */}
             <div style={{ position: 'absolute', bottom: 16, left: 20, right: 20 }}>
-              <div style={{ fontSize: '0.8rem', color: 'var(--brass)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+              <div style={{ fontSize: '0.8rem', color: inviteTheme.accent, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
                 Hosted by {event.hostName || 'Host'}
               </div>
               <h1
@@ -481,7 +661,7 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
                   fontFamily: cardFont.stack,
                   fontWeight: cardFont.weight,
                   fontSize: '1.78rem',
-                  color: 'var(--sand)',
+                  color: inviteTheme.textColor,
                   lineHeight: 1.12,
                   letterSpacing: '-0.015em',
                   textShadow: '0 2px 10px rgba(0,0,0,0.8)'
@@ -496,7 +676,7 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
           <div style={{ padding: '16px 20px' }}>
             {/* Description */}
             {event.description && (
-              <p style={{ fontSize: '0.88rem', color: 'rgba(255, 255, 255, 0.75)', lineHeight: 1.5, marginBottom: 16 }}>
+              <p style={{ fontSize: '0.88rem', color: inviteTheme.textColorMuted, lineHeight: 1.5, marginBottom: 16 }}>
                 {event.description}
               </p>
             )}
@@ -514,11 +694,11 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
               }}
             >
               <div style={{ background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: 12, padding: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ff407d', fontSize: '0.74rem', fontWeight: 700, textTransform: 'uppercase' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: inviteTheme.primary, fontSize: '0.74rem', fontWeight: 700, textTransform: 'uppercase' }}>
                   <Calendar size={13} />
                   <span>Date & Time</span>
                 </div>
-                <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#fff', marginTop: 4 }}>
+                <div style={{ fontSize: '0.88rem', fontWeight: 700, color: inviteTheme.textColor, marginTop: 4 }}>
                   {formattedDate}
                 </div>
                 <div style={{ fontSize: '0.78rem', color: 'rgba(255, 255, 255, 0.5)', marginTop: 2 }}>
@@ -528,11 +708,11 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
 
               {dressCodeText && (
                 <div style={{ background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: 12, padding: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ffd700', fontSize: '0.74rem', fontWeight: 700, textTransform: 'uppercase' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: inviteTheme.accent, fontSize: '0.74rem', fontWeight: 700, textTransform: 'uppercase' }}>
                     <Shirt size={13} strokeWidth={1.9} />
                     <span>Dress Code</span>
                   </div>
-                  <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#fff', marginTop: 4 }}>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 700, color: inviteTheme.textColor, marginTop: 4 }}>
                     {dressCodeText}
                   </div>
                 </div>
@@ -546,7 +726,7 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
                   </div>
                   <ul style={{ margin: '6px 0 0', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 3 }}>
                     {houseRuleLines.map((line) => (
-                      <li key={line} style={{ fontSize: '0.85rem', color: 'var(--sand)', display: 'flex', gap: 7 }}>
+                      <li key={line} style={{ fontSize: '0.85rem', color: inviteTheme.textColor, display: 'flex', gap: 7 }}>
                         <span aria-hidden="true" style={{ color: 'var(--brass)' }}>&mdash;</span>
                         <span>{line}</span>
                       </li>
@@ -576,7 +756,7 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <Lock size={16} strokeWidth={1.8} color="rgba(255,255,255,0.45)" style={{ flexShrink: 0 }} />
                   <div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#fff' }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: inviteTheme.textColor }}>
                       {event.venueName || 'Venue'}
                     </div>
                     <div style={{ fontSize: '0.77rem', color: 'rgba(255, 255, 255, 0.45)', marginTop: 2 }}>
@@ -591,8 +771,8 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
                     Address
                   </div>
 
-                  <div style={{ fontSize: '1rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <MapPin size={16} color="#ff407d" />
+                  <div style={{ fontSize: '1rem', fontWeight: 700, color: inviteTheme.textColor, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <MapPin size={16} color={inviteTheme.primary} />
                     <span>{event.venueName}</span>
                   </div>
 
@@ -602,9 +782,9 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
 
                   {event.doorCode && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, padding: '8px 12px', background: 'rgba(0, 0, 0, 0.4)', borderRadius: 8 }}>
-                      <Key size={14} color="#ffd700" />
+                      <Key size={14} color={inviteTheme.accent} />
                       <span style={{ fontSize: '0.78rem', color: 'rgba(255, 255, 255, 0.6)' }}>Gate / Entry Code:</span>
-                      <span style={{ fontSize: '0.88rem', fontFamily: 'monospace', fontWeight: 800, color: '#ffd700' }}>
+                      <span style={{ fontSize: '0.88rem', fontFamily: 'monospace', fontWeight: 800, color: inviteTheme.accent }}>
                         {event.doorCode}
                       </span>
                     </div>
@@ -814,22 +994,26 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
                     <CheckCircle2 size={15} strokeWidth={1.9} />
                     <span>You're in</span>
                   </div>
-                  <button
-                    onClick={downloadCalendarFile}
+                  {/* Calendar download lives in the Share sheet now (top nav →
+                      Share) instead of a second button here doing the same
+                      thing — one place for every "send this along" action. */}
+                  {!event.isPrivate && <button
+                    type="button"
+                    onClick={() => setIsShareOpen(true)}
                     className="btn-secondary"
                     style={{ padding: '4px 10px', fontSize: '0.72rem' }}
                   >
-                    <Download size={12} />
-                    <span>Add to calendar</span>
-                  </button>
+                    <Share2 size={12} />
+                    <span>Share</span>
+                  </button>}
                 </div>
               )}
             </div>
 
-
           </div>
         </div>
         </RevealOnScroll>
+        </InvitationOpening>
         </div>
 
         {/* Right column: host panel + notes */}
@@ -1206,110 +1390,16 @@ export default function LiveInviteView({ slug, inviteToken = null, onBackToStudi
         </div>
       )}
 
-      {/* Share Modal & WhatsApp/QR Sheet */}
-      {isShareOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 999,
-            background: 'rgba(5, 7, 12, 0.85)',
-            backdropFilter: 'blur(16px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 16
-          }}
-        >
-          <div
-            style={{
-              width: '100%',
-              maxWidth: 440,
-              padding: 24,
-              borderRadius: 20,
-              background: 'rgba(16,18,26,0.99)',
-              border: '1px solid rgba(255, 255, 255, 0.11)'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Share2 size={18} color="#ffd700" />
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff' }}>
-                  Send Invitation
-                </h3>
-              </div>
-              <button
-                onClick={() => setIsShareOpen(false)}
-                style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '1.1rem', cursor: 'pointer' }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <p style={{ fontSize: '0.82rem', color: 'rgba(255, 255, 255, 0.5)', marginBottom: 16 }}>
-              Send the link however you'd like.
-            </p>
-
-            {/* QR Code */}
-            {qrCodeUrl && (
-              <div style={{ textAlign: 'center', padding: '14px', background: 'rgba(255, 255, 255, 0.05)', borderRadius: 14, marginBottom: 16 }}>
-                <img
-                  src={qrCodeUrl}
-                  alt="Invitation QR Code"
-                  style={{ width: 140, height: 140, borderRadius: 10, margin: '0 auto', display: 'block' }}
-                />
-                <span style={{ fontSize: '0.72rem', color: 'rgba(255, 255, 255, 0.5)', marginTop: 6, display: 'block' }}>
-                  Scan to RSVP instantly
-                </span>
-              </div>
-            )}
-
-            {/* Actions */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <button
-                onClick={copyShareUrl}
-                className="btn-primary"
-                style={{ padding: '12px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-              >
-                {copied ? <Check size={16} /> : <Copy size={16} />}
-                <span>{copied ? '✓ Link Copied!' : 'Copy Shareable Link'}</span>
-              </button>
-
-              <a
-                href={getWhatsAppShareUrl()}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  padding: '12px',
-                  width: '100%',
-                  borderRadius: 12,
-                  background: '#25D366',
-                  color: '#fff',
-                  fontWeight: 700,
-                  fontSize: '0.88rem',
-                  textDecoration: 'none',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  cursor: 'pointer'
-                }}
-              >
-                <span>💬 Send via WhatsApp</span>
-              </a>
-
-              <button
-                onClick={downloadCalendarFile}
-                className="btn-secondary"
-                style={{ padding: '12px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-              >
-                <Download size={16} />
-                <span>Download .ICS Calendar</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* One share surface — QR, copy link, WhatsApp, ICS, and map links when
+          the venue is unlocked. See ShareSheet.jsx for why this replaced four
+          separate places that each did part of this. */}
+      <ShareSheet
+        isOpen={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
+        slug={slug}
+        event={event}
+        qrCodeUrl={qrCodeUrl}
+      />
     </div>
   );
 }

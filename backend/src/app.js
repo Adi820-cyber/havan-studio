@@ -54,12 +54,26 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://vercel.live"],
+        scriptSrc: ["'self'", "https://vercel.live"],
+        // Inline style attributes (React's style={{...}} usage throughout this
+        // codebase) compile to `style="..."` — removing 'unsafe-inline' here
+        // without first migrating every component to CSS classes would break
+        // the app's styling outright, so it stays for now. JavaScript no longer
+        // permits inline execution or eval-style compilation.
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://api.fontshare.com"],
         fontSrc: ["'self'", "data:", "https://fonts.gstatic.com", "https://cdn.fontshare.com"],
         imgSrc: ["'self'", "data:", "blob:", "https:"],
-        connectSrc: ["'self'", "https:", "wss:", "ws:"],
+        connectSrc: ["'self'", "https://vercel.live", "wss://vercel.live"],
         frameAncestors: ["'none'"],  // ← works in HTTP header, not <meta>
+        // Closes the gap vs. the previous policy: without these, a successful
+        // injection could still <object>/<embed> a plugin, submit a form to an
+        // attacker's domain, load a chunk via <base href> rebinding, or run
+        // code from an inline event handler attribute (onclick="...").
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        scriptSrcAttr: ["'none'"],
+        upgradeInsecureRequests: [],
       },
     },
     // HSTS
@@ -76,9 +90,11 @@ app.use(
     referrerPolicy: false,       // securityProxy sets Referrer-Policy
     dnsPrefetchControl: false,   // securityProxy sets X-DNS-Prefetch-Control
     xssFilter: false,            // securityProxy sets X-XSS-Protection: 0
-    // Let our middleware handle cross-origin policies
+    // Let our middleware handle cross-origin policies (COOP/CORP/COEP — see
+    // security.js). Setting them here too would just fight over who wins.
     crossOriginResourcePolicy: false,
     crossOriginOpenerPolicy: false,
+    crossOriginEmbedderPolicy: false,
   })
 );
 
@@ -86,8 +102,17 @@ app.use(
 app.use('/api', apiSecurityHeaders);
 
 /* ── 4. Logging ── */
+morgan.token('safe-url', (req) => {
+  const parsed = new URL(req.originalUrl || req.url || '/', 'http://localhost');
+  // Private invite credentials arrive as ?k= and older links may use ?token=.
+  // Keep useful request paths in logs without writing reusable guest links.
+  for (const key of ['k', 'token']) {
+    if (parsed.searchParams.has(key)) parsed.searchParams.set(key, '[redacted]');
+  }
+  return `${parsed.pathname}${parsed.search}`;
+});
 app.use(
-  morgan(':method :url :status :res[content-length] - :response-time ms', {
+  morgan(':method :safe-url :status :res[content-length] - :response-time ms', {
     skip: (req) => req.url === '/api/health', // Don't log health checks
   })
 );

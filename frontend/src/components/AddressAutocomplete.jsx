@@ -33,6 +33,7 @@ export default function AddressAutocomplete({
   onPick,
   placeholder,
   id,
+  required = false,
   accent = '#f5b544'
 }) {
   const [results, setResults] = useState([]);
@@ -164,6 +165,7 @@ export default function AddressAutocomplete({
           onKeyDown={onKeyDown}
           onFocus={() => results.length && setOpen(true)}
           placeholder={placeholder}
+          required={required}
           autoComplete="off"
           aria-autocomplete="list"
           aria-expanded={open}

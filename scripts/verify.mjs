@@ -31,7 +31,14 @@ import _traverse from '@babel/traverse';
 const traverse = _traverse.default || _traverse;
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const SRC = join(ROOT, 'src');
+// The React app lives at frontend/src — there used to be a second, stale copy
+// of it at the repo root (removed; see git history) that this pointed at
+// instead. That copy predated the current SSE-based realtime architecture
+// (frontend/src/hooks/useSSE.js) and still had a browser-side Supabase
+// Realtime client nothing else in the app uses anymore. Pointing here instead
+// of guessing which copy is "real" is what keeps this script checking the
+// code that actually ships.
+const SRC = join(ROOT, 'frontend', 'src');
 
 const problems = [];
 const fail = (file, msg) => problems.push(`${file.replace(ROOT + '/', '')}: ${msg}`);
@@ -162,12 +169,13 @@ const GLOBALS = new Set([
   'Number', 'Boolean', 'Promise', 'Map', 'Set', 'WeakMap', 'WeakSet', 'Error',
   'RegExp', 'Symbol', 'globalThis', 'localStorage', 'sessionStorage', 'crypto',
   'AudioContext', 'webkitAudioContext', 'IntersectionObserver', 'ResizeObserver',
+  'Notification',
   'MutationObserver', 'AbortController', 'CustomEvent', 'Event', 'HTMLElement',
   'performance', 'structuredClone', 'queueMicrotask', 'process', 'import',
   'undefined', 'NaN', 'Infinity', 'atob', 'btoa', 'alert', 'confirm', 'prompt',
   'getComputedStyle', 'matchMedia', 'React', 'encodeURIComponent',
   'decodeURIComponent', 'encodeURI', 'decodeURI', 'parseFloat', 'parseInt',
-  'isNaN', 'isFinite'
+  'isNaN', 'isFinite', 'EventSource'
 ]);
 
 for (const [file, ast] of asts) {

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ArrowLeft, MapPin, Camera, Aperture, Music, ListMusic, CalendarDays, Ticket } from 'lucide-react';
 import { api } from '../services/api';
 import Avatar from './Avatar';
+import { safeHttpsUrl } from '../utils/safeHttpsUrl';
 
 export default function PublicProfileView({ handle, onBack, currentUser, onOpenAuth }) {
   const [profile, setProfile] = useState(null);
@@ -97,7 +98,7 @@ export default function PublicProfileView({ handle, onBack, currentUser, onOpenA
 
       <main style={{ maxWidth: 560, margin: '0 auto', padding: '40px 22px 80px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-          <Avatar name={profile.displayName} avatarUrl={profile.avatarUrl} size={96} style={{ marginBottom: 20 }} />
+          <Avatar name={profile.displayName} avatar={profile.avatar} avatarUrl={profile.avatarUrl} size={96} style={{ marginBottom: 20 }} />
           
           <h1 style={{ fontSize: '1.8rem', fontWeight: 700, margin: '0 0 4px', color: '#fff' }}>
             {profile.displayName}
@@ -142,8 +143,8 @@ export default function PublicProfileView({ handle, onBack, currentUser, onOpenA
               const val = profile.socials[s.key];
               if (!val) return null;
               
-              let href = s.isFullUrl ? val : `${s.urlPrefix}${val}`;
-              if (!href.startsWith('http')) href = `https://${href}`;
+              const href = safeHttpsUrl(s.isFullUrl ? val : `${s.urlPrefix}${encodeURIComponent(val)}`);
+              if (!href) return null;
 
               return (
                 <a

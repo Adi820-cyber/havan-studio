@@ -18,6 +18,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
 const TOKEN_KEY = 'havan-access-token';
 const REFRESH_KEY = 'havan-refresh-token';
+let refreshSessionPromise = null;
 
 function storeSession(session) {
   if (!session) return;
@@ -36,6 +37,45 @@ function getAccessToken() {
 
 function getRefreshToken() {
   return localStorage.getItem(REFRESH_KEY);
+}
+
+function sessionExpiredMessage(path) {
+  if (path.startsWith('/api/rsvp/')) {
+    return 'Your guest session expired. Reload the invitation and try again; no account is needed.';
+  }
+  if (path.startsWith('/api/dashboard')) {
+    return 'Your session expired. Sign in again to view your dashboard.';
+  }
+  return 'Your session expired. Please sign in again.';
+}
+
+function refreshSession() {
+  if (!refreshSessionPromise) {
+    refreshSessionPromise = (async () => {
+      const refreshToken = getRefreshToken();
+      if (!refreshToken) return null;
+
+      try {
+        const response = await fetch(`${API_BASE}/api/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        });
+        if (!response.ok) return null;
+
+        const data = await response.json();
+        if (!data.session?.accessToken) return null;
+        storeSession(data.session);
+        return data.session;
+      } catch {
+        return null;
+      }
+    })().finally(() => {
+      refreshSessionPromise = null;
+    });
+  }
+
+  return refreshSessionPromise;
 }
 
 /* ────────────────────────────── http client ────────────────────────────── */
@@ -75,39 +115,53 @@ async function request(path, options = {}) {
     throw new Error('Cannot reach the server. Check your connection and try again.');
   }
 
-  // Token expired — try refresh once
-  if (res.status === 401 && retry) {
-    const refreshToken = getRefreshToken();
-    if (refreshToken) {
-      try {
-        const refreshRes = await fetch(`${API_BASE}/api/auth/refresh`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken }),
-        });
-
-        if (refreshRes.ok) {
-          const refreshData = await refreshRes.json();
-          storeSession(refreshData.session);
-          // Retry original request with new token
-          return request(path, { ...options, retry: false });
-        }
-      } catch {
-        // Refresh failed — clear session
-      }
-      clearSession();
+  // A rejected access token gets one refresh attempt, then is removed from
+  // storage. Do not keep sending a broken token on later public or dashboard
+  // requests. Requests that fail together share one refresh call because
+  // Supabase rotates refresh tokens after a successful exchange.
+  if (res.status === 401 && headers['Authorization']) {
+    if (retry) {
+      const refreshed = await refreshSession();
+      if (refreshed) return request(path, { ...options, retry: false });
     }
+
+    // Do not leave a rejected access token cached. The app listens for this
+    // transition and returns the user to the signed-out experience.
+    clearSession();
+    _notifyAuthListeners(null);
+  }
+
+  // 502 right after a fresh page load, with a token attached, is the specific
+  // pattern behind an intermittent "can't open my own invite" bug: opening a
+  // just-published invite navigates with a hard reload, which fires this
+  // request at almost the same moment the app's own session-restore call
+  // hits Supabase's Auth API — and a transient hiccup on that one call (not
+  // an expired token; a real token retried seconds later on its own succeeds
+  // every time) makes the server briefly treat the caller as anonymous for
+  // routes that tolerate that, which a private or host-scoped read can't
+  // recover from the way a public one can. One short-delay retry, not a loop,
+  // and only when a token was actually sent — a guest with no token at all
+  // hitting a real 502 is a different, real failure that should surface
+  // immediately, not be quietly retried into looking like it never happened.
+  if (res.status === 502 && retry && headers['Authorization']) {
+    await new Promise((r) => setTimeout(r, 400));
+    return request(path, { ...options, retry: false });
   }
 
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
     let defaultMsg = `Request failed with status ${res.status}`;
-    if (res.status === 404) {
+    if (res.status === 401 && headers['Authorization']) {
+      defaultMsg = sessionExpiredMessage(path);
+    } else if (res.status === 404) {
       defaultMsg = 'Backend API endpoint not found (404). Please ensure the backend server is running or configure VITE_API_BASE_URL to your active backend API.';
     } else if (res.status === 503 || res.status === 502) {
       defaultMsg = 'Backend API server is currently unavailable (502/503). Please try again in a moment.';
     }
-    const err = new Error(errorData.error || defaultMsg);
+    const clientMessage = res.status === 401 && headers['Authorization']
+      ? defaultMsg
+      : (errorData.error || defaultMsg);
+    const err = new Error(clientMessage);
     err.status = res.status;
     throw err;
   }
@@ -148,6 +202,7 @@ function toInvite(row) {
     byobNote: row.byob_note || '',
 
     venueAddress: row.venue_address ?? null,
+    venueOsmLabel: row.venue_osm_label ?? null,
     doorCode: row.door_code ?? null,
     venueLat: row.venue_lat != null ? Number(row.venue_lat) : null,
     venueLng: row.venue_lng != null ? Number(row.venue_lng) : null,
@@ -180,6 +235,8 @@ function toInvite(row) {
     coverImage: custom.coverImage || theme.posterUrl || null,
 
     createdAt: row.created_at,
+    updatedAt: row.updated_at ? new Date(row.updated_at) : (row.created_at ? new Date(row.created_at) : null),
+    updateMessage: row.last_update_message || ''
   };
 }
 
@@ -333,6 +390,14 @@ export const api = {
   async createEvent(input) {
     const { data } = await request('/api/events', {
       method: 'POST',
+      body: input,
+    });
+    return data;
+  },
+
+  async updateEvent(slug, input) {
+    const { data } = await request(`/api/events/${encodeURIComponent(slug)}`, {
+      method: 'PUT',
       body: input,
     });
     return data;

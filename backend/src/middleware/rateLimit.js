@@ -59,3 +59,12 @@ export const feedbackLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'You have sent a few notes already. Please try again later.' },
 });
+
+/** Realtime streams are longer-lived than normal requests, so throttle opens. */
+export const sseLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many live connections. Please try again shortly.' },
+});

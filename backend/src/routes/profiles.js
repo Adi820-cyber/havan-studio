@@ -12,6 +12,18 @@ import { asyncHandler, friendlyError } from '../middleware/errorHandler.js';
 
 const router = Router();
 
+function isOptionalHttpsUrl(value, maxLength = 2048) {
+  if (value == null || value === '') return true;
+  if (typeof value !== 'string' || value.length > maxLength) return false;
+
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === 'https:' && Boolean(url.hostname) && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * GET /api/profiles/me
  * Returns the caller's own profile.
@@ -41,6 +53,12 @@ router.put(
   requireAuth,
   asyncHandler(async (req, res) => {
     const input = req.body;
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+      return res.status(400).json({ error: 'Profile details must be sent as an object.' });
+    }
+    if (!isOptionalHttpsUrl(input.avatarUrl) || !isOptionalHttpsUrl(input.playlistUrl, 400)) {
+      return res.status(400).json({ error: 'Profile image and playlist links must be valid HTTPS URLs.' });
+    }
     const client = createUserClient(req.accessToken);
 
     const { data, error } = await client.rpc('update_my_profile', {
@@ -67,6 +85,9 @@ router.put(
           error: 'Handles can use letters, numbers, dots and underscores, 2–30 characters.',
         });
       }
+      if (/profile_url_invalid/i.test(msg)) {
+        return res.status(400).json({ error: 'Profile image and playlist links must be valid HTTPS URLs.' });
+      }
       return res.status(500).json({ error: friendlyError(error, 'Could not save your profile.') });
     }
 
@@ -84,7 +105,6 @@ router.get(
     const { handle } = req.params;
 
     // Use admin client for public profile reads (no auth needed)
-    const { createUserClient: _ } = await import('../config/supabase.js');
     const { adminClient } = await import('../config/supabase.js');
 
     const { data, error } = await adminClient.rpc('get_public_profile', {

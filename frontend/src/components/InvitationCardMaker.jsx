@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import {
   ArrowLeft, ArrowRight, Check, Copy, ExternalLink, Lock, LockOpen, MapPin,
@@ -10,6 +10,7 @@ import {
   DEFAULT_FONT, DEFAULT_REVEAL, DEFAULT_SOUND
 } from '../data/vibe';
 import { SEEN_HAI } from '../data/seenHai';
+import { descriptionExamplesFor, senderMessageExamplesFor } from '../data/descriptionExamples';
 import { CATEGORY_ICON, RSVP_ICON } from '../lib/icons';
 import { api } from '../services/api';
 import { playPop, playCelebrationChord } from '../utils/soundEffects';
@@ -21,6 +22,9 @@ import AddressAutocomplete from './AddressAutocomplete';
 import SeenHaiEditor from './SeenHaiEditor';
 import VibePicker from './VibePicker';
 import RevealOnScroll from './RevealOnScroll';
+import AuthModal from './AuthModal';
+import ShareSheet from './ShareSheet';
+import InvitationOpening from './InvitationOpening';
 
 /**
  * The studio.
@@ -70,9 +74,28 @@ export default function InvitationCardMaker({
   initialCategory = 'all',
   onBack,
   currentUser,
-  onOpenAuth
+  onAuthSuccess,
+  initialEvent = null
 }) {
+  const isEditing = Boolean(initialEvent);
   const [step, setStep] = useState(STEPS[0].id);
+
+  // The studio is reachable while signed out — filling in every field before
+  // being asked to log in is the whole point, since a account is only needed
+  // to *publish*, not to design. `AuthModal` used to be opened via a callback
+  // that told App.jsx to render it — but App.jsx renders this component through
+  // an early return that skips the tree AuthModal lives in, so that callback
+  // set state nobody ever painted. A guest who reached Publish saw an inline
+  // error and had no way to actually log in without hitting Back first, which
+  // discarded the whole form. Mounting AuthModal here instead means it opens
+  // in place, the draft never unmounts, and a successful login can retry the
+  // publish immediately with the same field values still in memory.
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState('register');
+  // Set right before opening the modal so the retry knows to fire once the
+  // user that triggered it is actually available, rather than retrying against
+  // whatever `currentUser` closed over at open time.
+  const [retryPublishAfterAuth, setRetryPublishAfterAuth] = useState(false);
   const [category, setCategory] = useState(initialCategory);
 
   const pickTemplate = (cat) => {
@@ -96,11 +119,14 @@ export default function InvitationCardMaker({
 
   // Every text field starts empty. The example supplies the placeholder only.
   const [title, setTitle] = useState('');
-  const [host, setHost] = useState('');
+  const [host, setHost] = useState(currentUser?.name || '');
+  const hostWasPrefilled = useRef(Boolean(currentUser?.name || initialEvent));
   const [venue, setVenue] = useState('');
   const [address, setAddress] = useState('');
   const [doorCode, setDoorCode] = useState('');
   const [description, setDescription] = useState('');
+  const [senderMessage, setSenderMessage] = useState('');
+  const [updateMessage, setUpdateMessage] = useState('');
   const [dressCode, setDressCode] = useState('');
 
   // House rules are a *set*. The old single-choice field made a host pick which
@@ -115,6 +141,12 @@ export default function InvitationCardMaker({
   const [soundId, setSoundId] = useState(DEFAULT_SOUND);
 
   const [startsAt, setStartsAt] = useState(defaultStart);
+  // `startsAt` always holds a real Date (it defaults to five days out, 8pm),
+  // so there is no "empty" state to check the way there is for title or
+  // venue. This tracks whether the host has actually opened the date picker
+  // and confirmed something, so publishing can require that instead of
+  // silently shipping a default nobody looked at.
+  const [dateConfirmed, setDateConfirmed] = useState(false);
   const [isPrivate, setIsPrivate] = useState(false);
   const [previewUnlocked, setPreviewUnlocked] = useState(false);
 
@@ -130,7 +162,9 @@ export default function InvitationCardMaker({
   const [publishError, setPublishError] = useState('');
   const [published, setPublished] = useState(null);
   const [qr, setQr] = useState('');
-  const [copied, setCopied] = useState(false);
+  // Copy-link/QR/WhatsApp all moved into ShareSheet — this just opens it.
+  const [isShareOpen, setIsShareOpen] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   const theme = useMemo(
     () => THEME_PALETTES.find((t) => t.id === themeId) || THEME_PALETTES[0],
@@ -159,6 +193,54 @@ export default function InvitationCardMaker({
       if (coverUpload?.previewUrl) URL.revokeObjectURL(coverUpload.previewUrl);
     };
   }, [coverUpload]);
+
+  // Open the same studio with a saved invitation loaded into every field.
+  useEffect(() => {
+    if (!initialEvent) return;
+    const custom = initialEvent.customization || {};
+    const matchingTemplate = TEMPLATES.find((item) => item.vibeTag === initialEvent.vibeTag)
+      || pickTemplate(custom.category || initialCategory);
+    setStep('details');
+    setCategory(custom.category || matchingTemplate.category || 'all');
+    setTemplate(matchingTemplate);
+    setThemeId(initialEvent.theme?.presetId || matchingTemplate.theme);
+    setCover(initialEvent.coverImage || initialEvent.theme?.posterUrl || matchingTemplate.image);
+    setTitle(initialEvent.title || '');
+    setHost(initialEvent.hostName || '');
+    setVenue(initialEvent.venueName || '');
+    setAddress(initialEvent.venueAddress || '');
+    setDoorCode(initialEvent.doorCode || '');
+    setDescription(initialEvent.description || '');
+    setSenderMessage(custom.senderMessage || '');
+    setDressCode(custom.dressCode?.title || '');
+    setHouseRules([]);
+    setHouseNote(Array.isArray(custom.houseRules)
+      ? custom.houseRules.join(' · ')
+      : (initialEvent.byobNote || ''));
+    setFontId(custom.fontId || DEFAULT_FONT);
+    setRevealId(custom.revealId || DEFAULT_REVEAL);
+    setSoundId(custom.soundId || DEFAULT_SOUND);
+    setStartsAt(initialEvent.startsAt ? new Date(initialEvent.startsAt) : defaultStart());
+    setDateConfirmed(Boolean(initialEvent.startsAt));
+    setIsPrivate(Boolean(initialEvent.isPrivate));
+    setGeo({ lat: initialEvent.venueLat, lng: initialEvent.venueLng, label: initialEvent.venueOsmLabel || null });
+    if (custom.rsvpOptions) {
+      setReplies((previous) => ({
+        yes: { ...previous.yes, ...custom.rsvpOptions.yes },
+        maybe: { ...previous.maybe, ...custom.rsvpOptions.maybe },
+        no: { ...previous.no, ...custom.rsvpOptions.no }
+      }));
+    }
+  // `initialEvent` is the snapshot being edited; this component is mounted for
+  // each edit session so it should be applied once, without resetting drafts.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialEvent]);
+
+  useEffect(() => {
+    if (initialEvent || hostWasPrefilled.current || !currentUser?.name) return;
+    hostWasPrefilled.current = true;
+    if (!host.trim()) setHost(currentUser.name);
+  }, [currentUser?.name, host, initialEvent]);
 
   /** What the card shows: the typed value, or the placeholder in a lighter tone. */
   const shown = (value, fallback) => ({
@@ -233,13 +315,41 @@ export default function InvitationCardMaker({
   const handlePublish = async () => {
     setPublishError('');
 
-    if (!title.trim() && !template.title) {
-      setPublishError('Give your gathering a name.');
+    // Real required-field checks against the raw state, not against `f.*`.
+    // `f.title.text` / `f.venue.text` fall back to the template's placeholder
+    // text so the *preview* never looks broken while a host is still typing —
+    // but that fallback was also what got published if a host clicked
+    // straight through both steps without typing anything, since the payload
+    // below used to read from `f.*` too. A published invite whose real title
+    // is a stock example line is not a small bug; it is the difference
+    // between "an invite for the gathering you typed" and "an invite for a
+    // gathering that doesn't exist."
+    const missing = [];
+    if (!title.trim()) missing.push('a name for the gathering');
+    if (!host.trim()) missing.push('the host name');
+    if (!venue.trim()) missing.push('a venue name');
+    if (!address.trim()) missing.push('the full address');
+    if (!dateConfirmed) missing.push('the actual date and time');
+
+    if (missing.length) {
+      const list = missing.length === 1
+        ? missing[0]
+        : `${missing.slice(0, -1).join(', ')} and ${missing[missing.length - 1]}`;
+      setPublishError(`Before this goes out, it still needs ${list}.`);
+      // Jump back to the field the host still has to fill in rather than
+      // just showing an error on a step they may have already left.
+      if (step !== 'details') goToDetails();
       return;
     }
+
     if (!currentUser) {
-      setPublishError('Create a free account to publish. Your guests still reply without one.');
-      if (onOpenAuth) onOpenAuth('register');
+      // Opens right here, in place — the form underneath keeps every value the
+      // host already typed. See the note above `isAuthOpen` for why this used
+      // to silently fail instead.
+      setPublishError('Create a free account to publish. Your guests still reply without one — sign in below and this picks up right where you left off.');
+      setAuthModalMode('register');
+      setRetryPublishAfterAuth(true);
+      setIsAuthOpen(true);
       return;
     }
 
@@ -255,19 +365,19 @@ export default function InvitationCardMaker({
       }
 
       // Publish exactly what the preview shows.
-      const ev = await api.createEvent({
-        title: f.title.text,
+      const input = {
+        title: title.trim(),
         subtitle: null,
-        hostName: f.host.text,
-        description: f.description.text,
+        hostName: host.trim(),
+        description: description.trim() || null,
         startsAt: startsAt.toISOString(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        venueName: f.venue.text,
-        venueAddress: f.address.text,
+        venueName: venue.trim(),
+        venueAddress: address.trim(),
         venueLat: geo.lat,
         venueLng: geo.lng,
         venueOsmLabel: geo.label,
-        doorCode: f.doorCode.text,
+        doorCode: doorCode.trim() || null,
         // One string for the legacy column, the structured list for the invite.
         byobNote: ruleLines.join(' · '),
         hideUntilRsvp: true,
@@ -275,9 +385,11 @@ export default function InvitationCardMaker({
         vibeTag: template.vibeTag,
         theme: { presetId: themeId, posterUrl: coverUrl },
         customization: {
+          category,
           vibeTag: template.vibeTag,
           coverImage: coverUrl,
-          dressCode: { title: f.dressCode.text },
+          senderMessage: senderMessage.trim(),
+          dressCode: { title: dressCode.trim() },
           houseRules: ruleLines,
           fontId,
           revealId,
@@ -289,7 +401,10 @@ export default function InvitationCardMaker({
           },
           soundFreqs: soundscape.freqs.length ? soundscape.freqs : theme.soundFreqs
         }
-      });
+      };
+      const ev = isEditing
+        ? await api.updateEvent(initialEvent.slug, { ...input, updateMessage: updateMessage.trim() })
+        : await api.createEvent(input);
 
       setPublished(ev);
       setQr(await api.qrDataUrl(ev.slug));
@@ -310,6 +425,19 @@ export default function InvitationCardMaker({
       setPublishing(false);
     }
   };
+
+  // Fires once `currentUser` actually lands, right after AuthModal closes on a
+  // successful login/signup. Effect (not the modal's own onAuthSuccess) so it
+  // runs with the freshly-updated `currentUser` closed over correctly, instead
+  // of the stale `null` handlePublish captured on its first, failed call.
+  useEffect(() => {
+    if (retryPublishAfterAuth && currentUser) {
+      setRetryPublishAfterAuth(false);
+      setPublishError('');
+      handlePublish();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser, retryPublishAfterAuth]);
 
   /* ────────────────── shared styles ────────────────── */
   const label = {
@@ -364,6 +492,16 @@ export default function InvitationCardMaker({
   const goToDetails = () => {
     setStep('details');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const copyPartyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(published?.slug || '');
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 1800);
+    } catch {
+      setPublishError('Could not copy the party code. Select and copy it manually.');
+    }
   };
 
   const goToVibe = () => {
@@ -454,7 +592,7 @@ export default function InvitationCardMaker({
                 className="lp-btn lp-btn-primary"
                 style={{ padding: '9px 20px', fontSize: '0.88rem', opacity: publishing ? 0.6 : 1 }}
               >
-                <span>{publishing ? 'Publishing…' : 'Publish'}</span>
+                <span>{publishing ? (isEditing ? 'Saving…' : 'Publishing…') : (isEditing ? 'Save changes' : 'Publish')}</span>
                 {!publishing && <ArrowRight size={15} strokeWidth={2.1} />}
               </button>
             ) : (
@@ -472,20 +610,43 @@ export default function InvitationCardMaker({
         </div>
       </header>
 
-      {/* ───────── 50 / 50 ───────── */}
+      {/*
+        ───────── 50 / 50 ─────────
+        Two independent scroll containers, not one page-length scroll with a
+        sticky column pinned inside it. The old layout only had `position:
+        sticky` on the left column, which meant there was exactly one scroll
+        context for the whole page — hovering the card and scrolling moved the
+        same scrollbar as hovering the form, so a host trying to read the form
+        with their mouse resting on the card preview would drag the *entire
+        page*, form included, and the "sticky" card never actually stayed put
+        relative to what the mouse was over. Fixed height + two independently
+        scrolling children fixes both: the mouse's position decides which
+        panel scrolls, exactly like a native split-pane editor.
+      */}
       <main
         className="lp-studio-main"
         style={{
-          maxWidth: 1240, margin: '0 auto', padding: '26px 22px 60px',
-          display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, alignItems: 'start'
+          maxWidth: 1240, margin: '0 auto', padding: '26px 22px 0',
+          display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, alignItems: 'stretch',
+          height: 'calc(100vh - 60px)', // 60px = the sticky header's fixed height
+          overflow: 'hidden'
         }}
       >
-        {/* ── LEFT: the card ── */}
-        <div className="lp-studio-preview" style={{ position: 'sticky', top: 86 }}>
+        {/* ── LEFT: the card, its own scroll container ── */}
+        <div
+          className="lp-studio-preview"
+          style={{
+            height: '100%',
+            overflowY: 'auto',
+            overscrollBehavior: 'contain',
+            paddingBottom: 60,
+            paddingRight: 4
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 11 }}>
             <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', gap: 6 }}>
               <Eye size={13} strokeWidth={1.9} />
-              What your guests see
+              What your guests see · tap the note to preview its opening
             </span>
             <button
               type="button"
@@ -498,6 +659,11 @@ export default function InvitationCardMaker({
             </button>
           </div>
 
+          <InvitationOpening
+            key={revealId}
+            event={{ hostName: f.host.text, title: f.title.text, customization: { senderMessage, revealId } }}
+            theme={theme}
+          >
           <RevealOnScroll key={revealId} revealId={revealId}>
             <div
               style={{
@@ -677,20 +843,31 @@ export default function InvitationCardMaker({
             </div>
           </div>
           </RevealOnScroll>
+          </InvitationOpening>
         </div>
 
-        {/* ── RIGHT: the fields ── */}
-        <div>
+        {/* ── RIGHT: the fields, its own scroll container — see the note
+            above <main> for why this and the preview column each need one. ── */}
+        <div
+          style={{
+            height: '100%',
+            overflowY: 'auto',
+            overscrollBehavior: 'contain',
+            paddingBottom: 60,
+            paddingRight: 4
+          }}
+        >
           {step === 'details' ? (
             <>
               {sectionHead('The details')}
 
               <div style={block}>
-                <label htmlFor="m-title" style={label}>Name of the gathering</label>
+                <label htmlFor="m-title" style={label}>Name of the gathering <span aria-hidden="true">*</span></label>
                 <input
                   id="m-title"
                   type="text"
                   value={title}
+                  required
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder={template.title}
                   style={input}
@@ -713,14 +890,98 @@ export default function InvitationCardMaker({
                   placeholder={template.description}
                   style={{ ...input, resize: 'vertical', lineHeight: 1.5 }}
                 />
+
+                {/* A blank textarea with only a placeholder works once a host
+                    already knows what a good invite description sounds like —
+                    it's a wall for anyone who doesn't. These are real lines,
+                    not a tone reference; tapping one drops it straight into the
+                    field above, in front of the host, ready to edit. */}
+                <details style={{ marginTop: 8 }} open>
+                  <summary
+                    style={{
+                      cursor: 'pointer',
+                      fontSize: '0.83rem',
+                      fontWeight: 700,
+                      color: theme.accent,
+                      padding: '4px 0',
+                      listStyle: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6
+                    }}
+                  >
+                    <Sparkles size={13} strokeWidth={2} />
+                    <span>{`A first draft for this ${template.vibeTag.toLowerCase()} — tap to make it yours`}</span>
+                  </summary>
+                  <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {descriptionExamplesFor(category === 'all' ? template.category : category).map((set) => (
+                      <div key={set.id}>
+                        <div
+                          style={{
+                            fontSize: '0.73rem',
+                            fontWeight: 700,
+                            letterSpacing: '0.04em',
+                            textTransform: 'uppercase',
+                            color: theme.accent,
+                            marginBottom: 7,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 5
+                          }}
+                        >
+                          <span aria-hidden="true">{set.emoji}</span>
+                          <span>{set.label}</span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                          {set.examples.map((ex, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => setDescription(ex)}
+                              style={{
+                                textAlign: 'left',
+                                padding: '11px 13px',
+                                borderRadius: 10,
+                                border: '1px solid rgba(255,255,255,0.16)',
+                                background: 'rgba(255,255,255,0.06)',
+                                color: 'rgba(255,255,255,0.88)',
+                                font: 'inherit',
+                                fontSize: '0.83rem',
+                                lineHeight: 1.55,
+                                cursor: 'pointer',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                                transition: 'background 0.15s ease, border-color 0.15s ease'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = `${theme.accent}1f`;
+                                e.currentTarget.style.borderColor = `${theme.accent}88`;
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
+                                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)';
+                              }}
+                              title={ex}
+                            >
+                              {ex}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </details>
               </div>
 
               <div style={block}>
-                <label htmlFor="m-host" style={label}>Hosted by</label>
+                <label htmlFor="m-host" style={label}>Hosted by <span aria-hidden="true">*</span></label>
                 <input
                   id="m-host"
                   type="text"
                   value={host}
+                  required
                   onChange={(e) => setHost(e.target.value)}
                   placeholder={currentUser?.name || template.host}
                   style={input}
@@ -728,17 +989,60 @@ export default function InvitationCardMaker({
               </div>
 
               <div style={block}>
-                <DateTimePicker value={startsAt} onChange={setStartsAt} label="When" accent={theme.accent} />
+                <label htmlFor="m-sender-message" style={label}>
+                  A note from you
+                  <span style={{ color: theme.accent }}> — guests see this before the details</span>
+                </label>
+                <textarea
+                  id="m-sender-message"
+                  rows={2}
+                  maxLength={320}
+                  value={senderMessage}
+                  onChange={(e) => setSenderMessage(e.target.value)}
+                  placeholder="A personal line for the person opening your invitation"
+                  style={{ ...input, resize: 'vertical', lineHeight: 1.5 }}
+                />
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                  {senderMessageExamplesFor(category === 'all' ? template.category : category).map((example, index) => (
+                    <button
+                      key={`${category}-${index}`}
+                      type="button"
+                      onClick={() => setSenderMessage(example)}
+                      className="lp-chip"
+                      style={{ padding: '6px 9px', fontSize: '0.73rem', textAlign: 'left' }}
+                      title={example}
+                    >
+                      <span style={{ display: '-webkit-box', maxWidth: 250, WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {example}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={block}>
+                <DateTimePicker
+                  value={startsAt}
+                  onChange={(d) => { setStartsAt(d); setDateConfirmed(true); }}
+                  label="When *"
+                  accent={theme.accent}
+                />
+                {!dateConfirmed && (
+                  <p style={{ margin: '6px 0 0', fontSize: '0.78rem', color: 'rgba(245, 181, 68, 0.85)' }}>
+                    Showing a placeholder date — open this and pick the real one before publishing.
+                  </p>
+                )}
               </div>
 
               {sectionHead('Where')}
 
               <div style={block}>
-                <label htmlFor="m-venue" style={label}>Venue name — everyone sees this</label>
+                <label htmlFor="m-venue" style={label}>Venue name — everyone sees this <span aria-hidden="true">*</span></label>
                 <input
                   id="m-venue"
                   type="text"
                   value={venue}
+                  required
                   onChange={(e) => setVenue(e.target.value)}
                   placeholder={template.venue}
                   style={input}
@@ -747,18 +1051,34 @@ export default function InvitationCardMaker({
 
               <div style={block}>
                 <label htmlFor="m-address" style={label}>
-                  Full address
+                  Full address <span aria-hidden="true">*</span>
                   <span style={{ color: theme.accent }}> — hidden until they reply</span>
                 </label>
                 <AddressAutocomplete
                   id="m-address"
                   value={address}
+                  required
                   onChange={setAddress}
                   onPick={setGeo}
                   placeholder="Search for the venue, or type the address"
                   accent={theme.accent}
                 />
               </div>
+
+              {isEditing && (
+                <div style={block}>
+                  <label htmlFor="m-update-message" style={label}>Message to attendees about this change</label>
+                  <textarea
+                    id="m-update-message"
+                    rows={2}
+                    maxLength={300}
+                    value={updateMessage}
+                    onChange={(e) => setUpdateMessage(e.target.value)}
+                    placeholder="Example: We have moved the start time to 8 pm."
+                    style={{ ...input, resize: 'vertical', lineHeight: 1.5 }}
+                  />
+                </div>
+              )}
 
               <div style={block}>
                 <label htmlFor="m-code" style={label}>
@@ -904,7 +1224,7 @@ export default function InvitationCardMaker({
                   className="lp-btn lp-btn-primary"
                   style={{ flex: 1, minWidth: 220, padding: '14px', fontSize: '0.94rem', opacity: publishing ? 0.6 : 1 }}
                 >
-                  <span>{publishing ? 'Publishing' : 'Publish and get the link'}</span>
+                  <span>{publishing ? (isEditing ? 'Saving…' : 'Publishing…') : (isEditing ? 'Save changes' : 'Publish and get the link')}</span>
                   {!publishing && <ArrowRight size={16} strokeWidth={2.1} />}
                 </button>
               </div>
@@ -986,7 +1306,7 @@ export default function InvitationCardMaker({
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Invitation published"
+          aria-label={isEditing ? 'Invitation changes saved' : 'Invitation published'}
           style={{
             position: 'fixed', inset: 0, zIndex: 9999,
             display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
@@ -1018,37 +1338,32 @@ export default function InvitationCardMaker({
             <div style={{ textAlign: 'center', marginBottom: 22 }}>
               <Sparkles size={22} strokeWidth={1.9} color="#f5b544" />
               <h2 style={{ margin: '10px 0 5px', fontSize: '1.24rem', fontWeight: 700, color: '#fff' }}>
-                It's live
+                {isEditing ? 'Changes saved' : "It's live"}
               </h2>
               <p style={{ margin: 0, fontSize: '0.87rem', color: 'rgba(255,255,255,0.5)' }}>
-                {isPrivate ? 'Now add the people you want to invite.' : 'Share the link and watch the replies come in.'}
+                {isEditing
+                  ? 'Guests on the invitation see the change now. Everyone else sees it the next time they open the link.'
+                  : isPrivate ? 'Now add the people you want to invite.' : 'Share the link and watch the replies come in.'}
               </p>
             </div>
 
-            {!isPrivate && (
-              <div style={{ display: 'flex', gap: 7, marginBottom: 18 }}>
-                <input
-                  type="text"
-                  readOnly
-                  aria-label="Invitation link"
-                  value={api.inviteUrl(published.slug)}
-                  style={{ ...input, fontSize: '0.83rem' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(api.inviteUrl(published.slug)).then(() => {
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 1800);
-                    });
-                  }}
-                  className="lp-btn lp-btn-primary"
-                  style={{ padding: '11px 15px', fontSize: '0.85rem', flexShrink: 0 }}
-                >
-                  {copied ? <Check size={14} strokeWidth={2.4} /> : <Copy size={14} strokeWidth={2} />}
+            <div style={{ marginBottom: 18, padding: 13, border: '1px solid rgba(192,146,46,0.34)', background: 'rgba(192,146,46,0.07)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'rgba(230,213,174,0.62)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 7 }}>
+                Party code
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <code style={{ minWidth: 0, overflowWrap: 'anywhere', color: '#f5f7fa', fontSize: '0.84rem' }}>{published.slug}</code>
+                <button type="button" onClick={copyPartyCode} className="lp-chip" style={{ flexShrink: 0, padding: '6px 10px' }}>
+                  {codeCopied ? <Check size={13} /> : <Copy size={13} />}
+                  <span>{codeCopied ? 'Copied' : 'Copy code'}</span>
                 </button>
               </div>
-            )}
+              <div style={{ marginTop: 6, fontSize: '0.73rem', color: 'rgba(230,213,174,0.46)' }}>
+                {isPrivate
+                  ? 'Use the personal guest links below for entry. This code identifies the party for the host.'
+                  : 'Enter this code under “I have an invite” to find the gathering.'}
+              </div>
+            </div>
 
             {isPrivate && (
               <div style={{ marginBottom: 20, paddingBottom: 20, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
@@ -1056,48 +1371,72 @@ export default function InvitationCardMaker({
               </div>
             )}
 
-            {qr && !isPrivate && (
-              <div style={{ textAlign: 'center', marginBottom: 18 }}>
-                <img
-                  src={qr}
-                  alt={`QR code for ${f.title.text}`}
-                  width={128}
-                  height={128}
-                  style={{ borderRadius: 10, display: 'block', margin: '0 auto' }}
-                />
-                <span style={{ fontSize: '0.74rem', color: 'rgba(255,255,255,0.35)', marginTop: 6, display: 'block' }}>
-                  Or let them scan it
-                </span>
-              </div>
-            )}
-
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
               <button
                 type="button"
-                onClick={() => { window.location.href = `/invite/${published.slug}`; }}
+                onClick={() => {
+                  if (isEditing) onBack?.();
+                  else window.location.href = `/invite/${published.slug}`;
+                }}
                 className="lp-btn lp-btn-primary"
                 style={{ width: '100%', padding: '12px' }}
               >
                 <ExternalLink size={15} strokeWidth={2} />
-                <span>Open the invitation</span>
+                <span>{isEditing ? 'Return to the invitation' : 'Open the invitation'}</span>
               </button>
 
+              {/* Everything else — copy link, QR, WhatsApp, ICS, map links — is
+                  one surface now (see ShareSheet.jsx). This screen used to carry
+                  its own separate copy-link input, its own QR image and its own
+                  WhatsApp button, all duplicating what the invite page's Share
+                  button already opened; a public event now just opens the same
+                  sheet everyone else uses. Private events skip it — there is no
+                  one public link to share, only per-guest ones, which
+                  InviteeManager above already handles. */}
               {!isPrivate && (
-                <a
-                  href={api.whatsAppUrl(published)}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => setIsShareOpen(true)}
                   className="lp-btn lp-btn-ghost"
-                  style={{ width: '100%', padding: '12px', textDecoration: 'none' }}
+                  style={{ width: '100%', padding: '12px' }}
                 >
                   <Send size={15} strokeWidth={2} />
-                  <span>Send on WhatsApp</span>
-                </a>
+                  <span>Share the invite</span>
+                </button>
               )}
             </div>
           </div>
         </div>
       )}
+
+      <ShareSheet
+        isOpen={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
+        slug={published?.slug}
+        event={published}
+        qrCodeUrl={qr}
+        title="It's live — share it"
+      />
+
+      {/* Mounted here, not by App.jsx — see the note above isAuthOpen. Every
+          field on this page is untouched by this modal opening or closing. */}
+      <AuthModal
+        isOpen={isAuthOpen}
+        initialMode={authModalMode}
+        onClose={() => {
+          setIsAuthOpen(false);
+          // Closed without completing — nothing to retry, and the inline
+          // publishError from handlePublish is still visible underneath.
+          setRetryPublishAfterAuth(false);
+        }}
+        onAuthSuccess={(user) => {
+          setIsAuthOpen(false);
+          if (onAuthSuccess) onAuthSuccess(user);
+          // The retry effect above does the actual re-publish once `currentUser`
+          // (a prop, updated by App.jsx off the back of onAuthSuccess) reflects
+          // this new session.
+        }}
+      />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { TEMPLATES, THEME_PALETTES } from './data/templates';
 import Navbar from './components/Navbar';
 import HeroSection from './components/HeroSection';
+import InvitationStory from './components/InvitationStory';
 import TemplatePlayground from './components/TemplatePlayground';
 import HowItWorks from './components/HowItWorks';
 import WhyHavan from './components/WhyHavan';
@@ -14,6 +15,7 @@ import ProfilePanel from './components/ProfilePanel';
 import AuthModal from './components/AuthModal';
 import CheckInviteModal from './components/CheckInviteModal';
 import PublicProfileView from './components/PublicProfileView';
+import DeveloperNotes from './components/DeveloperNotes';
 import { api } from './services/api';
 
 function getSlugFromLocation() {
@@ -88,6 +90,7 @@ export default function App() {
   const [isMakerOpen, setIsMakerOpen] = useState(initialMakerState.isMaker);
   const [makerCategory, setMakerCategory] = useState(initialMakerState.category || 'all');
   const [isProfileOpen, setIsProfileOpen] = useState(() => hashIs('me', 'profile'));
+  const [isNotesOpen, setIsNotesOpen] = useState(() => hashIs('notes', 'dev-notes'));
   // A signed-in person gets their dashboard at "/". The marketing page is still
   // reachable on purpose — from the footer, or by anyone who wants to look at it.
   const [wantsLanding, setWantsLanding] = useState(() => hashIs('about', 'home'));
@@ -109,6 +112,7 @@ export default function App() {
   const [authModalMode, setAuthModalMode] = useState('login'); // 'login' | 'register'
 
   const [isCheckInviteOpen, setIsCheckInviteOpen] = useState(false);
+  const [dashboardPanel, setDashboardPanel] = useState(null);
 
   // Track the signed-in host. Guests who RSVP get an *anonymous* session so
   // their reply can be tied to a real auth.uid(); that is not an account, so it
@@ -155,6 +159,7 @@ export default function App() {
         setMakerCategory(makerState.category);
       }
       setIsProfileOpen(hashIs('me', 'profile'));
+      setIsNotesOpen(hashIs('notes', 'dev-notes'));
       setWantsLanding(hashIs('about', 'home'));
       if (window.location.hash === '#check-invite') {
         setIsCheckInviteOpen(true);
@@ -184,6 +189,7 @@ export default function App() {
   };
 
   const handleOpenMaker = (category = 'all') => {
+    setDashboardPanel(null);
     setMakerCategory(category);
     setIsMakerOpen(true);
     window.history.pushState(null, '', `#/maker?category=${category}`);
@@ -193,9 +199,29 @@ export default function App() {
   const goHome = useCallback(() => {
     setIsMakerOpen(false);
     setIsProfileOpen(false);
+    setIsNotesOpen(false);
     setWantsLanding(false);
     window.history.pushState(null, '', window.location.pathname);
   }, []);
+
+  const handleOpenDashboardPanel = useCallback((sectionId) => {
+    setDashboardPanel(sectionId === 'templates' || sectionId === 'invite-story' ? 'styles' : 'how-it-works');
+  }, []);
+
+  const handleCloseDashboardPanel = useCallback(() => {
+    setDashboardPanel(null);
+  }, []);
+
+  const handleOpenCheckInvite = useCallback(() => {
+    setDashboardPanel(null);
+    setIsCheckInviteOpen(true);
+  }, []);
+
+  const handleOpenNotes = () => {
+    setIsNotesOpen(true);
+    window.history.pushState(null, '', '#/notes');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const handleOpenProfile = () => {
     setIsProfileOpen(true);
@@ -241,6 +267,7 @@ export default function App() {
       <LiveInviteView
         slug={inviteSlug}
         inviteToken={inviteToken}
+        currentUser={currentUser}
         onBackToStudio={() => {
           window.history.pushState(null, '', '/');
           setInviteSlug(null);
@@ -255,13 +282,19 @@ export default function App() {
         initialCategory={makerCategory}
         onBack={goHome}
         currentUser={currentUser}
-        onOpenAuth={handleOpenAuth}
+        onAuthSuccess={setCurrentUser}
       />
     );
   }
 
   if (isProfileOpen && currentUser) {
     return <ProfilePanel onBack={goHome} onSaved={setProfile} />;
+  }
+
+  // Public — reachable whether or not anyone is signed in, same as the footer
+  // that links to it.
+  if (isNotesOpen) {
+    return <DeveloperNotes onBack={goHome} />;
   }
 
   // Hold the first paint until the session is known, so a returning user never
@@ -295,7 +328,8 @@ export default function App() {
         currentUser={currentUser}
         profile={profile}
         onOpenAuth={handleOpenAuth}
-        onOpenCheckInvite={() => setIsCheckInviteOpen(true)}
+        onOpenCheckInvite={handleOpenCheckInvite}
+        onOpenDashboardPanel={handleOpenDashboardPanel}
         onOpenProfile={handleOpenProfile}
         onLogout={handleLogout}
       />
@@ -317,7 +351,7 @@ export default function App() {
         onSelectInvite={handleSelectInviteFromCheck}
       />
 
-      {withFooter && <Footer onOpenMaker={handleOpenMaker} />}
+      {withFooter && <Footer onOpenMaker={handleOpenMaker} onOpenNotes={handleOpenNotes} />}
     </div>
   );
 
@@ -328,8 +362,10 @@ export default function App() {
         profile={profile}
         currentUser={currentUser}
         onOpenMaker={handleOpenMaker}
-        onOpenCheckInvite={() => setIsCheckInviteOpen(true)}
+        onOpenCheckInvite={handleOpenCheckInvite}
         onOpenProfile={handleOpenProfile}
+        dashboardPanel={dashboardPanel}
+        onCloseDashboardPanel={handleCloseDashboardPanel}
       />,
       false
     );
@@ -342,8 +378,10 @@ export default function App() {
         activeTemplate={activeTemplate}
         onSelectTemplate={setActiveTemplate}
         onOpenMaker={handleOpenMaker}
-        onOpenCheckInvite={() => setIsCheckInviteOpen(true)}
+        onOpenCheckInvite={handleOpenCheckInvite}
       />
+
+      <InvitationStory onOpenMaker={handleOpenMaker} />
 
       <TemplatePlayground
         templates={TEMPLATES}

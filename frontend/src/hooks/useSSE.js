@@ -51,8 +51,8 @@ export function useLiveEvent(eventId, onChange, scope = 'default') {
         if (cancelled) return;
         try {
           const data = JSON.parse(event.data);
-          if (data.type === 'rsvp_update' || data.type === 'comment_update') {
-            cb.current?.();
+          if (data.type === 'rsvp_update' || data.type === 'comment_update' || data.type === 'event_update') {
+            cb.current?.(data.type);
           }
         } catch {
           // Ignore parse errors (heartbeats, etc.)

@@ -61,6 +61,19 @@ export const CARD_FONTS = [
     stack: "'JetBrains Mono', ui-monospace, monospace",
     note: 'Fixed width. Reads like a pass, not a party.',
     weight: 600
+  },
+  {
+    id: 'kalam',
+    name: 'Kalam',
+    stack: "'Kalam', 'Mukta', cursive",
+    // Genuinely handwritten, not the costume-calligraphy kind — closer to a
+    // note passed at the door than a wedding stationer's script, which is why
+    // it clears the "never" list the other deco-adjacent scripts don't. Also
+    // the one script face that sets Devanagari natively, same as Mukta, so a
+    // Hinglish title in this hand still reads as one line, not two fonts
+    // stitched together.
+    note: 'Like it was written by hand, not lettered. Sets Devanagari too.',
+    weight: 400
   }
 ];
 
@@ -72,9 +85,9 @@ export function fontById(id) {
 
 /* ══════════════════════════ reveals ══════════════════════════
  *
- * Twelve ways the card opens when the guest scrolls to it. The CSS lives in
- * styles/reveals.css; this is the list the studio shows and the id that gets
- * published.
+ * Seventeen ways the card reveals itself after the guest opens the note. The CSS lives in
+ * styles/reveals.css and InvitationOpening.jsx; this is the list the studio
+ * shows and the id that gets published.
  *
  * `moods` drives the "fits your vibe" ordering, the same way backgrounds work —
  * a mehfil should be offered the slow dissolve before the theatre curtain.
@@ -95,8 +108,43 @@ export const REVEALS = [
   {
     id: 'envelope',
     name: 'Envelope',
-    note: 'The flap falls forward and the card lifts out.',
+    note: 'A personal note arrives first, then the invitation opens.',
     moods: ['wedding', 'mehfil']
+  },
+  {
+    id: 'scroll',
+    name: 'Story scroll',
+    inspiration: 'Cheriyal-inspired · Telangana',
+    note: 'A scroll-like cover unrolls to bring the invitation into view.',
+    moods: ['wedding', 'mehfil', 'birthday']
+  },
+  {
+    id: 'kabutar',
+    name: 'Kabutar paighaam',
+    inspiration: 'Playful messenger motif',
+    note: 'A paper bird carries your personal note. A playful modern motif.',
+    moods: ['mehfil', 'wedding', 'birthday']
+  },
+  {
+    id: 'kathputli',
+    name: 'Puppet-stage curtain',
+    inspiration: 'Kathputli-inspired · Rajasthan',
+    note: 'A small stage opens to introduce the host and their invitation.',
+    moods: ['wedding', 'birthday', 'happyhours']
+  },
+  {
+    id: 'warli-circle',
+    name: 'Gathering circle',
+    inspiration: 'Warli-inspired · Maharashtra',
+    note: 'A hand-drawn circle of figures gathers around your message.',
+    moods: ['mehfil', 'birthday', 'happyhours']
+  },
+  {
+    id: 'madhubani-frame',
+    name: 'Floral line reveal',
+    inspiration: 'Madhubani-inspired · Mithila',
+    note: 'A botanical motif draws in before the invitation opens.',
+    moods: ['wedding', 'birthday', 'mehfil']
   },
   {
     id: 'stepwell',
@@ -154,7 +202,7 @@ export const REVEALS = [
   }
 ];
 
-export const DEFAULT_REVEAL = 'gate';
+export const DEFAULT_REVEAL = 'envelope';
 
 export function revealById(id) {
   return REVEALS.find((r) => r.id === id) || REVEALS[0];

@@ -11,6 +11,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { authLimiter } from '../middleware/rateLimit.js';
 import { asyncHandler, friendlyError } from '../middleware/errorHandler.js';
 import { localStore } from '../services/localStore.js';
+import { USE_LOCAL_FALLBACK } from '../config/env.js';
 
 const router = Router();
 
@@ -73,9 +74,23 @@ router.post(
         },
       });
     } catch (err) {
-      // Fallback for local development if Supabase is offline/unreachable
-      const { user, session } = localStore.createUser({ email, name, avatar, isAnonymous: false });
-      return res.status(201).json({ user, session });
+      // The real cause — wrong Supabase credentials, RLS, a genuinely down
+      // project, a duplicate email — always reaches the log, whether or not
+      // the fallback below ends up running.
+      console.error(`[auth/signup] Supabase call failed: ${err.message || err}`);
+
+      // Only ever a local-dev convenience, and only when explicitly turned on
+      // (see USE_LOCAL_FALLBACK in config/env.js). Never in production: a
+      // "successful" signup served from this store is a fake session that
+      // vanishes on the next serverless invocation, and the previous
+      // unconditional version of this fallback is what made that failure
+      // silent instead of visible.
+      if (USE_LOCAL_FALLBACK) {
+        const { user, session } = localStore.createUser({ email, name, avatar, isAnonymous: false });
+        return res.status(201).json({ user, session });
+      }
+
+      return res.status(502).json({ error: friendlyError(err, 'Could not create your account. Please try again.') });
     }
   })
 );
@@ -111,8 +126,18 @@ router.post(
         },
       });
     } catch (err) {
-      const { user, session } = localStore.createUser({ email, name: email.split('@')[0], isAnonymous: false });
-      return res.json({ user, session });
+      console.error(`[auth/login] Supabase call failed: ${err.message || err}`);
+
+      // See the note in /signup above. A wrong password used to silently
+      // "succeed" here by handing back a brand-new fake account with a
+      // different name than the one that owns that email — which is a worse
+      // outcome than telling the person their password is wrong.
+      if (USE_LOCAL_FALLBACK) {
+        const { user, session } = localStore.createUser({ email, name: email.split('@')[0], isAnonymous: false });
+        return res.json({ user, session });
+      }
+
+      return res.status(401).json({ error: friendlyError(err, 'That email and password combination did not match.') });
     }
   })
 );
@@ -153,8 +178,17 @@ router.post(
         },
       });
     } catch (err) {
-      const { user, session } = localStore.createUser({ isAnonymous: true });
-      return res.json({ user, session });
+      console.error(`[auth/anonymous] Supabase call failed: ${err.message || err}`);
+
+      // This is the guest RSVP path — a fake anonymous session here means a
+      // guest's RSVP looks like it saved and then is gone the moment a
+      // different serverless instance handles their next request.
+      if (USE_LOCAL_FALLBACK) {
+        const { user, session } = localStore.createUser({ isAnonymous: true });
+        return res.json({ user, session });
+      }
+
+      return res.status(502).json({ error: friendlyError(err, 'Could not start your session. Please try again.') });
     }
   })
 );

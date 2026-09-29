@@ -37,3 +37,5 @@ mycollection.zip
 *Security Scan Report.html
 security-report.html
 
+.vercel
+.env*

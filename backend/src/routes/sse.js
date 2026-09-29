@@ -13,10 +13,15 @@
  * GET /api/sse/events/:eventId
  */
 import { Router } from 'express';
+import crypto from 'crypto';
 import { adminClient } from '../config/supabase.js';
 import { optionalAuth } from '../middleware/auth.js';
+import { sseLimiter } from '../middleware/rateLimit.js';
 
 const router = Router();
+const activeStreamsByIp = new Map();
+const MAX_ACTIVE_STREAMS_PER_IP = 6;
+const EVENT_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /**
  * GET /api/sse/events/:eventId
@@ -25,13 +30,21 @@ const router = Router();
  */
 router.get(
   '/events/:eventId',
+  sseLimiter,
   optionalAuth,
   (req, res) => {
     const { eventId } = req.params;
 
-    if (!eventId) {
-      return res.status(400).json({ error: 'Event ID is required.' });
+    if (!EVENT_ID_PATTERN.test(eventId || '')) {
+      return res.status(400).json({ error: 'A valid event ID is required.' });
     }
+
+    const clientIp = req.ip || 'unknown';
+    const activeCount = activeStreamsByIp.get(clientIp) || 0;
+    if (activeCount >= MAX_ACTIVE_STREAMS_PER_IP) {
+      return res.status(429).json({ error: 'Too many live connections. Close another invitation and try again.' });
+    }
+    activeStreamsByIp.set(clientIp, activeCount + 1);
 
     // SSE headers
     res.writeHead(200, {
@@ -64,7 +77,7 @@ router.get(
     };
 
     // Subscribe to Supabase Realtime for this event
-    const channelId = `sse:${eventId}:${Math.random().toString(36).slice(2, 10)}`;
+    const channelId = `sse:${eventId}:${crypto.randomUUID()}`;
 
     const channel = adminClient
       .channel(channelId)
@@ -78,13 +91,21 @@ router.get(
         { event: '*', schema: 'public', table: 'comments', filter: `event_id=eq.${eventId}` },
         () => notify('comment_update')
       )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'events', filter: `id=eq.${eventId}` },
+        () => notify('event_update')
+      )
       .subscribe();
 
     // Cleanup on client disconnect
-    req.on('close', () => {
+    res.on('close', () => {
       clearInterval(heartbeat);
       if (debounceTimer) clearTimeout(debounceTimer);
       adminClient.removeChannel(channel);
+      const remaining = Math.max(0, (activeStreamsByIp.get(clientIp) || 1) - 1);
+      if (remaining === 0) activeStreamsByIp.delete(clientIp);
+      else activeStreamsByIp.set(clientIp, remaining);
     });
   }
 );

@@ -383,17 +383,13 @@ export const TEMPLATES = [
 
 export const THEME_PALETTES = [
   /**
-   * Five palettes, all built from the six brand colours.
+   * Nine palettes, including the original looks and new Indian-inspired sets.
    *
    * The ids are unchanged from the old neon set — "theme-retro-disco" and the
    * rest — because they are stored on every already-published event and renaming
    * them would silently repaint invitations people have already sent. Only the
-   * values moved.
-   *
-   * Every one sits on the night base. The direction is explicit: event pages are
-   * indigo regardless of the device setting, because the feeling wanted is
-   * standing outside a door, and a light card does not do that. `theme-cubist-blush`
-   * is the one exception — a stone card for a daytime thing.
+   * values moved. The new sets add saffron, mehendi, rose sandstone, and
+   * Jodhpur indigo combinations with their own readable card and page colors.
    */
   {
     id: 'theme-mystic-sufi',
@@ -464,6 +460,62 @@ export const THEME_PALETTES = [
     textColorMuted: 'rgba(245,247,250,0.6)',
     soundId: 'disco',
     soundFreqs: [146.83, 185.0, 220.0]
+  },
+  {
+    id: 'theme-kesar-dawat',
+    name: 'Kesar daawat',
+    tag: 'Saffron & marigold',
+    primary: '#E39434',
+    accent: '#F2C56E',
+    bg: '#23160F',
+    cardBg: 'rgba(50, 32, 20, 0.96)',
+    border: 'rgba(227, 148, 52, 0.48)',
+    textColor: '#FFF3D5',
+    textColorMuted: 'rgba(255,243,213,0.65)',
+    soundId: 'shehnai',
+    soundFreqs: [233.08, 349.23, 466.16]
+  },
+  {
+    id: 'theme-mehendi-courtyard',
+    name: 'Mehendi courtyard',
+    tag: 'Mehendi green',
+    primary: '#72A482',
+    accent: '#D4B76A',
+    bg: '#10231D',
+    cardBg: 'rgba(24, 52, 42, 0.96)',
+    border: 'rgba(114, 164, 130, 0.46)',
+    textColor: '#EFF5E9',
+    textColorMuted: 'rgba(239,245,233,0.64)',
+    soundId: 'tanpura-d',
+    soundFreqs: [146.83, 220.0, 293.66]
+  },
+  {
+    id: 'theme-jharokha-gulabi',
+    name: 'Gulabi jharokha',
+    tag: 'Rose sandstone',
+    primary: '#D77C84',
+    accent: '#E9BC78',
+    bg: '#271820',
+    cardBg: 'rgba(61, 35, 48, 0.96)',
+    border: 'rgba(215, 124, 132, 0.46)',
+    textColor: '#FFF0E8',
+    textColorMuted: 'rgba(255,240,232,0.64)',
+    soundId: 'tanpura-d',
+    soundFreqs: [146.83, 220.0, 293.66]
+  },
+  {
+    id: 'theme-jodhpur-dusk',
+    name: 'Jodhpur dusk',
+    tag: 'Indigo & brass',
+    primary: '#7194C5',
+    accent: '#D6AD55',
+    bg: '#111B30',
+    cardBg: 'rgba(29, 45, 74, 0.96)',
+    border: 'rgba(113, 148, 197, 0.48)',
+    textColor: '#F2F2EC',
+    textColorMuted: 'rgba(242,242,236,0.65)',
+    soundId: 'shehnai',
+    soundFreqs: [220.0, 293.66, 392.0]
   }
 ];
 

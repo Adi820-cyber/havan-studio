@@ -24,7 +24,8 @@ import Avatar from './Avatar';
  * implies a social graph the product does not have yet.
  */
 
-const AVATARS = Array.from({ length: 67 }, (_, i) => `/avatars/png/${i + 1}.png`);
+// The downloaded illustrated avatar pack is served from frontend/public.
+const AVATARS = Array.from({ length: 67 }, (_, index) => `/avatars/png/${index + 1}.png`);
 
 export default function ProfilePanel({ onBack, onSaved }) {
   const [loading, setLoading] = useState(true);
@@ -38,6 +39,7 @@ export default function ProfilePanel({ onBack, onSaved }) {
     handle: '',
     bio: '',
     city: '',
+    avatar: '✨',
     avatarUrl: '',
     isPublic: true,
     instagram: '',
@@ -58,6 +60,7 @@ export default function ProfilePanel({ onBack, onSaved }) {
           handle: p.handle || '',
           bio: p.bio || '',
           city: p.city || '',
+          avatar: p.avatar || '✨',
           avatarUrl: p.avatarUrl || '',
           isPublic: p.isPublic !== false,
           instagram: p.socials.instagram || '',
@@ -83,14 +86,18 @@ export default function ProfilePanel({ onBack, onSaved }) {
 
   const handleSave = async () => {
     setError('');
+    if (!form.displayName.trim()) {
+      setError('Add the name you want people to see on your profile.');
+      return;
+    }
     setSaving(true);
     try {
       const updated = await api.updateMyProfile(form);
-      if (updated) {
-        setStats(updated.stats);
-        setSaved(true);
-        if (onSaved) onSaved(updated);
-      }
+      if (!updated) throw new Error('Your profile did not return a saved version. Please try again.');
+      setStats(updated.stats);
+      setForm((previous) => ({ ...previous, displayName: updated.displayName || previous.displayName }));
+      setSaved(true);
+      if (onSaved) onSaved(updated);
     } catch (err) {
       setError(err.message || 'Could not save your profile.');
     } finally {
@@ -220,7 +227,7 @@ export default function ProfilePanel({ onBack, onSaved }) {
         ) : (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 6 }}>
-              <Avatar name={form.displayName || 'You'} avatarUrl={form.avatarUrl} size={54} />
+          <Avatar name={form.displayName || 'You'} avatar={form.avatar} avatarUrl={form.avatarUrl} size={54} />
               <div>
                 <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff' }}>
                   {form.displayName || 'Your name'}
@@ -289,6 +296,8 @@ export default function ProfilePanel({ onBack, onSaved }) {
                 type="text"
                 value={form.displayName}
                 onChange={set('displayName')}
+                required
+                maxLength={80}
                 placeholder="What your friends call you"
                 style={input}
               />
@@ -321,27 +330,36 @@ export default function ProfilePanel({ onBack, onSaved }) {
             </div>
 
             <div style={{ marginBottom: 6 }}>
-              <span style={label}>Avatar</span>
+              <span style={label}>Choose your avatar</span>
+              <p style={{ margin: '4px 0 10px', fontSize: '0.8rem', lineHeight: 1.45, color: 'rgba(255,255,255,0.45)' }}>
+                Choose one of the illustrated avatars that appears beside your name across Havan.
+              </p>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(60px, 1fr))', gap: 10, maxHeight: 300, overflowY: 'auto', padding: 10, background: 'rgba(255,255,255,0.02)', borderRadius: 12 }}>
-                {AVATARS.map((a) => (
+                {AVATARS.map((avatarUrl, index) => (
                   <button
-                    key={a}
+                    key={avatarUrl}
                     type="button"
-                    onClick={() => { setSaved(false); setForm((f) => ({ ...f, avatarUrl: a })); }}
-                    aria-pressed={form.avatarUrl === a}
+                    onClick={() => { setSaved(false); setForm((f) => ({ ...f, avatarUrl })); }}
+                    aria-pressed={form.avatarUrl === avatarUrl}
+                    aria-label={`Choose illustrated avatar ${index + 1}`}
                     style={{
                       width: '100%',
                       aspectRatio: '1',
                       borderRadius: '50%',
                       cursor: 'pointer',
-                      padding: 0,
+                      padding: 5,
                       overflow: 'hidden',
-                      background: form.avatarUrl === a ? 'rgba(245,181,68,0.14)' : 'rgba(255,255,255,0.04)',
-                      border: form.avatarUrl === a ? '2px solid #f5b544' : '2px solid transparent',
+                      background: form.avatarUrl === avatarUrl ? 'rgba(245,181,68,0.14)' : 'rgba(255,255,255,0.04)',
+                      border: form.avatarUrl === avatarUrl ? '2px solid #f5b544' : '2px solid transparent',
                       transition: 'all 0.2s'
                     }}
                   >
-                    <img src={a} alt="avatar option" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img
+                      src={avatarUrl}
+                      alt=""
+                      loading="lazy"
+                      style={{ display: 'block', width: '100%', height: '100%', objectFit: 'contain' }}
+                    />
                   </button>
                 ))}
               </div>
@@ -395,6 +413,12 @@ export default function ProfilePanel({ onBack, onSaved }) {
                 <LinkIcon size={15} style={{ flexShrink: 0, marginTop: 1 }} />
                 <span>{error}</span>
               </div>
+            )}
+
+            {saved && !error && (
+              <p role="status" style={{ margin: '0 0 12px', color: '#a7e2c6', fontSize: '0.84rem', textAlign: 'center' }}>
+                Your profile changes are saved.
+              </p>
             )}
 
             <button

@@ -136,6 +136,37 @@ class LocalStore {
     return event;
   }
 
+  updateEvent(slug, input, user) {
+    const event = this.events.get(slug);
+    if (!event || !user || event.host_id !== user.id) return null;
+
+    Object.assign(event, {
+      title: input.title.trim(),
+      subtitle: input.subtitle || '',
+      host_name: input.hostName.trim(),
+      description: input.description || '',
+      vibe_tag: input.vibeTag || '',
+      starts_at: input.startsAt,
+      ends_at: input.endsAt || null,
+      timezone: input.timezone || 'UTC',
+      venue_name: input.venueName.trim(),
+      venue_address: input.venueAddress.trim(),
+      venue_lat: input.venueLat ?? null,
+      venue_lng: input.venueLng ?? null,
+      venue_osm_label: input.venueOsmLabel || null,
+      door_code: input.doorCode || null,
+      byob_note: input.byobNote || null,
+      is_private: Boolean(input.isPrivate),
+      theme: input.theme || {},
+      customization: input.customization || {},
+      last_update_message: (input.updateMessage || '').trim().slice(0, 300)
+        || 'The host updated this invitation. Please check the latest details.',
+      updated_at: new Date().toISOString(),
+    });
+
+    return { id: event.id, slug: event.slug, title: event.title };
+  }
+
   getInvite(slug, user) {
     const event = this.events.get(slug);
     if (!event) return null;

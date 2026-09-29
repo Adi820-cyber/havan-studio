@@ -64,6 +64,9 @@ router.get(
     const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
 
     const contentType = req.query.contentType || 'image/jpeg';
+    if (typeof contentType !== 'string' || contentType !== 'image/jpeg') {
+      return res.status(415).json({ error: 'Only JPEG image uploads are supported.' });
+    }
     const rand = crypto.randomUUID();
     const objectKey = `${req.user.id}/${rand}.jpg`;
 

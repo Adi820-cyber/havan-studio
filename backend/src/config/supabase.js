@@ -37,15 +37,23 @@ export const adminClient = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_R
  * @returns {import('@supabase/supabase-js').SupabaseClient}
  */
 export function createUserClient(accessToken) {
-  return createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+  const options = {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
     },
-    global: {
+  };
+
+  // Only override Authorization for an actual signed-in or anonymous-session
+  // token. An empty `Bearer ` header overrides Supabase's public anon-key
+  // authorization and makes otherwise public invitation reads fail with 401.
+  if (typeof accessToken === 'string' && accessToken.trim()) {
+    options.global = {
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
-    },
-  });
+    };
+  }
+
+  return createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, options);
 }

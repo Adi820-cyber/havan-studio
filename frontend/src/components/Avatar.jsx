@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 /**
  * Initial avatar.
@@ -36,8 +36,11 @@ function initialOf(name) {
   return [...trimmed][0].toUpperCase();
 }
 
-export default function Avatar({ name, avatarUrl, size = 34, title, style }) {
+export default function Avatar({ name, avatarUrl, avatar, size = 34, title, style }) {
   const p = paletteFor(name);
+  const [imageFailed, setImageFailed] = useState(false);
+  useEffect(() => setImageFailed(false), [avatarUrl]);
+  const showImage = Boolean(avatarUrl && !imageFailed);
   return (
     <span
       title={title || name || undefined}
@@ -50,8 +53,8 @@ export default function Avatar({ name, avatarUrl, size = 34, title, style }) {
         height: size,
         flexShrink: 0,
         borderRadius: '50%',
-        background: avatarUrl ? 'transparent' : p.bg,
-        border: avatarUrl ? 'none' : `1px solid ${p.ring}`,
+        background: showImage ? 'transparent' : p.bg,
+        border: showImage ? 'none' : `1px solid ${p.ring}`,
         color: p.fg,
         fontSize: Math.round(size * 0.42),
         fontWeight: 700,
@@ -62,14 +65,15 @@ export default function Avatar({ name, avatarUrl, size = 34, title, style }) {
         ...style
       }}
     >
-      {avatarUrl ? (
+      {showImage ? (
         <img
           src={avatarUrl}
           alt={name ? `${name}'s avatar` : 'Avatar'}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          onError={() => setImageFailed(true)}
         />
       ) : (
-        initialOf(name)
+        avatar || initialOf(name)
       )}
     </span>
   );

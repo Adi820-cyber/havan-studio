@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowRight, Ticket } from 'lucide-react';
 import InteractiveCard from './InteractiveCard';
+import HeroLogo from './HeroLogo';
 import { CATEGORY_ICON, LiveDot, Reveal } from '../lib/icons';
 
 /**
@@ -42,6 +43,15 @@ export default function HeroSection({
         >
           {/* ---------- Narrative ---------- */}
           <Reveal>
+            {/* Centered hero logo above headline */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-start',
+              marginBottom: 32
+            }}>
+              <HeroLogo size={140} animate={true} />
+            </div>
+
             <h1
               style={{
                 fontFamily: "var(--font-display, 'Space Grotesk', sans-serif)",
@@ -53,9 +63,9 @@ export default function HeroSection({
                 color: '#f7f8fa'
               }}
             >
-              Stop planning parties
+              A proper daawat
               <br />
-              in the group chat.
+              starts with an invite.
             </h1>
 
             <p
@@ -67,14 +77,14 @@ export default function HeroSection({
                 margin: '0 0 32px'
               }}
             >
-              Make the invite, send the link, see who is actually coming. The exact
-              address unlocks once they reply, so it does not end up screenshotted
-              into three other groups.
+              Make a personal invitation for your mehfil, birthday, wedding, or
+              rooftop scene. Send one link, collect replies, and keep the exact
+              address private until a guest responds.
             </p>
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 34 }}>
-              <button type="button" onClick={() => onOpenMaker('all')} className="lp-btn lp-btn-primary">
-                <span>Create an invite</span>
+              <button type="button" onClick={() => onOpenMaker(activeTemplate?.category || 'all')} className="lp-btn lp-btn-primary">
+                <span>Make your invitation</span>
                 <ArrowRight size={17} strokeWidth={2} />
               </button>
               <button type="button" onClick={onOpenCheckInvite} className="lp-btn lp-btn-ghost">

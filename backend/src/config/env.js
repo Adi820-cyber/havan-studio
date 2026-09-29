@@ -52,10 +52,30 @@ if (!awsConfigured) {
 
 /* ── export ── */
 
+const NODE_ENV = process.env.NODE_ENV || 'development';
+
+// Whether routes are allowed to fall back to the in-memory localStore when a
+// real Supabase call fails.
+//
+// This used to be implicit: every route with a try/catch around a Supabase
+// call fell back to localStore on ANY failure — wrong credentials, RLS
+// denial, a typo in an RPC name, Supabase being genuinely down, all treated
+// identically and all silently hidden from the caller. On Vercel specifically
+// that is not a graceful degradation, it is data loss: each serverless
+// invocation can get a fresh, empty localStore, so a "successful" signup or
+// RSVP served from the fallback on one invocation is invisible to the next.
+//
+// `NODE_ENV === 'production'` always wins here, even if USE_LOCAL_FALLBACK is
+// left set to something truthy in a production environment by mistake — this
+// is deliberately not just "off by default", it is "impossible to turn on in
+// prod", because the failure mode it enables is silent by design and would be
+// very hard to notice happening again.
+export const USE_LOCAL_FALLBACK = NODE_ENV !== 'production' && process.env.USE_LOCAL_FALLBACK === 'true';
+
 const env = {
   // Server
   PORT: parseInt(process.env.PORT, 10) || 3000,
-  NODE_ENV: process.env.NODE_ENV || 'development',
+  NODE_ENV,
 
   // CORS — comma-separated list of allowed origins
   CORS_ORIGINS: process.env.CORS_ORIGINS

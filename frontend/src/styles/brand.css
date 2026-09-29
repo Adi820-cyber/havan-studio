@@ -102,7 +102,9 @@ body {
 
 h1, h2, h3, h4,
 .lp-h1, .lp-h2, .lp-h3 {
-  font-family: var(--font-display) !important;
+  /* Keep heading defaults below component styles so card-specific type choices
+     applied inline by the invitation maker and guest view remain visible. */
+  font-family: var(--font-display);
   font-weight: 500;
   letter-spacing: -0.01em;
   line-height: 1.05;
@@ -255,6 +257,204 @@ h1, h2, h3, h4,
   font-family: var(--font-sans);
 }
 
+#templates,
+#how-it-works,
+#invite-story {
+  scroll-margin-top: 82px;
+}
+
+/* ── invitation story demo ──
+   Motion is user-triggered and demonstrates the real invite-opening component;
+   this section stays still until the visitor chooses a style and opens it. */
+.havan-story-section {
+  border-top: 1px solid rgba(230, 213, 174, 0.08);
+  border-bottom: 1px solid rgba(230, 213, 174, 0.08);
+  background: rgba(17, 26, 50, 0.52);
+}
+
+.havan-story-section--compact {
+  padding: 28px 0 38px !important;
+  border-top: 1px solid rgba(230, 213, 174, 0.1);
+  border-bottom: 1px solid rgba(230, 213, 174, 0.1);
+  background: transparent;
+}
+
+.havan-story-section--compact .lp-head {
+  margin-bottom: 24px;
+}
+
+.havan-story-section--compact .lp-h2 {
+  font-size: clamp(1.4rem, 3vw, 1.9rem);
+}
+
+.havan-story-section--compact .havan-story-layout {
+  gap: 24px;
+}
+
+.havan-story-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.78fr) minmax(0, 1.22fr);
+  align-items: start;
+  gap: clamp(28px, 6vw, 72px);
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.havan-story-options-label {
+  margin: 0 0 12px;
+  color: var(--sand-dim);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.havan-story-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.havan-story-option {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 13px 15px;
+  color: var(--sand);
+  text-align: left;
+  font: inherit;
+  clip-path: var(--chamfer-btn);
+  border: 1px solid rgba(230, 213, 174, 0.16);
+  background: rgba(230, 213, 174, 0.035);
+  cursor: pointer;
+  transition: background 180ms ease, border-color 180ms ease;
+}
+
+.havan-story-option:hover,
+.havan-story-option[aria-pressed="true"] {
+  border-color: var(--brass);
+  background: rgba(192, 146, 46, 0.12);
+}
+
+.havan-story-option-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.havan-story-option-origin {
+  color: rgba(230, 213, 174, 0.55);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.havan-story-footnote {
+  margin: 8px 0 0;
+  color: rgba(230, 213, 174, 0.42);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.havan-story-preview { min-width: 0; }
+
+.havan-story-preview-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 26px;
+  margin-bottom: 10px;
+  color: rgba(230, 213, 174, 0.58);
+  font-size: 0.77rem;
+}
+
+.havan-story-replay {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  color: var(--sand);
+  font: inherit;
+  font-size: 0.77rem;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.havan-story-replay:hover { color: var(--brass-lift); }
+
+.havan-story-card {
+  padding: 23px clamp(18px, 4vw, 30px) 25px;
+  color: var(--sand);
+  background: var(--indigo) !important;
+  border: 1px solid color-mix(in srgb, var(--story-accent) 46%, transparent);
+  clip-path: var(--chamfer-zig);
+}
+
+.havan-story-card-kicker {
+  margin-bottom: 10px;
+  color: var(--story-accent);
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.havan-story-card h3 {
+  margin: 0 0 8px;
+  color: var(--sand);
+  font-family: var(--font-display);
+  font-size: clamp(1.45rem, 3vw, 2rem);
+  line-height: 1.14;
+}
+
+.havan-story-host {
+  margin: 0 0 20px;
+  color: rgba(230, 213, 174, 0.63);
+  font-size: 0.88rem;
+}
+
+.havan-story-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px 20px;
+  padding: 15px 0;
+  border-top: 1px solid rgba(230, 213, 174, 0.15);
+  border-bottom: 1px solid rgba(230, 213, 174, 0.15);
+}
+
+.havan-story-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: rgba(230, 213, 174, 0.82);
+  font-size: 0.84rem;
+}
+
+.havan-story-meta svg { color: var(--story-accent); flex: 0 0 auto; }
+
+.havan-story-rsvp {
+  margin-top: 15px;
+  color: rgba(230, 213, 174, 0.48);
+  font-size: 0.78rem;
+}
+
+.havan-story-cta { margin-top: 14px; }
+
+@media (max-width: 760px) {
+  .havan-story-section { padding: 76px 0; }
+  .havan-story-layout { grid-template-columns: 1fr; gap: 24px; }
+  .havan-story-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .havan-story-options-label,
+  .havan-story-footnote { grid-column: 1 / -1; }
+  .havan-story-footnote { margin-top: 0; }
+}
+
+@media (max-width: 440px) {
+  .havan-story-options { grid-template-columns: 1fr; }
+  .havan-story-option { padding: 11px 13px; }
+  .havan-story-meta { flex-direction: column; }
+}
+
 /* The day base. Used for anything administrative or read at length — a
    courtyard at 11am rather than standing outside the door. Two-pixel ink
    borders, no shadows. */
@@ -280,6 +480,14 @@ h1, h2, h3, h4,
 .havan-state-going { color: var(--brass); }
 .havan-state-live { color: var(--rani); }
 .havan-state-full { color: var(--chrome); }
+
+@media (max-width: 520px) {
+  .havan-invite-nav { padding: 10px 12px !important; gap: 8px; }
+  .havan-invite-nav-actions { gap: 6px !important; }
+  .havan-invite-back { padding: 6px 10px !important; }
+  .havan-browser-alert-toggle { padding: 8px !important; }
+  .havan-browser-alert-toggle span { display: none; }
+}
 
 /* ══════════════════════ motion ══════════════════════ */
 

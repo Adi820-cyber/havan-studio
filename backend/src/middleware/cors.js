@@ -23,7 +23,9 @@ const corsOptions = {
 
     callback(new Error(`Origin ${origin} not allowed by CORS`));
   },
-  credentials: true,
+  // The SPA sends bearer tokens in Authorization headers; it does not use
+  // cross-origin cookies, so do not authorize credentialed CORS requests.
+  credentials: false,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
   exposedHeaders: ['X-Request-ID'],

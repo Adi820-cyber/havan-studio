@@ -1,0 +1,132 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gold gradient for H1 letters -->
+    <linearGradient id="goldGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#F4E4C1;stop-opacity:1" />
+      <stop offset="30%" style="stop-color:#E6D5AE;stop-opacity:1" />
+      <stop offset="70%" style="stop-color:#C0922E;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#996515;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Flame gradient -->
+    <radialGradient id="flameGradient" cx="50%" cy="60%">
+      <stop offset="0%" style="stop-color:#FFF9E6;stop-opacity:1" />
+      <stop offset="30%" style="stop-color:#FFE57F;stop-opacity:1" />
+      <stop offset="60%" style="stop-color:#FFB74D;stop-opacity:1" />
+      <stop offset="85%" style="stop-color:#FF9800;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E65100;stop-opacity:0.9" />
+    </radialGradient>
+    
+    <!-- Brass base gradient -->
+    <linearGradient id="brassGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#D4AF37;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#C0922E;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#996515;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Glow effect -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Base/Platform -->
+  <g filter="url(#shadow)">
+    <!-- Platform base -->
+    <ellipse cx="256" cy="420" rx="140" ry="24" fill="url(#brassGradient)" opacity="0.9"/>
+    <path d="M 130 410 Q 256 425 382 410 L 370 390 Q 256 400 142 390 Z" 
+          fill="url(#brassGradient)" opacity="0.85"/>
+    
+    <!-- Decorative platform edge -->
+    <path d="M 120 400 L 130 395 L 382 395 L 392 400 L 382 405 L 130 405 Z" 
+          fill="#D4AF37" opacity="0.7"/>
+  </g>
+  
+  <!-- Left vertical bar of H -->
+  <g filter="url(#shadow)">
+    <path d="M 140 390 L 150 110 Q 150 100 160 100 L 190 100 Q 200 100 200 110 L 190 390 Z" 
+          fill="url(#goldGradient)"/>
+    <!-- Highlight on left edge -->
+    <path d="M 150 110 L 155 110 L 145 380 L 140 380 Z" 
+          fill="#F4E4C1" opacity="0.4"/>
+  </g>
+  
+  <!-- Right vertical bar of 1 -->
+  <g filter="url(#shadow)">
+    <path d="M 322 390 L 332 110 Q 332 100 342 100 L 372 100 Q 382 100 382 110 L 372 390 Z" 
+          fill="url(#goldGradient)"/>
+    <!-- Highlight on left edge -->
+    <path d="M 332 110 L 337 110 L 327 380 L 322 380 Z" 
+          fill="#F4E4C1" opacity="0.4"/>
+    
+    <!-- Serif top of 1 -->
+    <path d="M 300 110 Q 302 100 312 100 L 342 100 L 340 120 L 305 120 Z" 
+          fill="url(#goldGradient)" opacity="0.9"/>
+  </g>
+  
+  <!-- Flame in center (between H and 1) -->
+  <g filter="url(#glow)">
+    <!-- Main central flame -->
+    <path d="M 256 280 Q 240 220 245 180 Q 248 140 256 90 Q 264 140 267 180 Q 272 220 256 280 Z" 
+          fill="url(#flameGradient)"/>
+    
+    <!-- Left flame curl -->
+    <path d="M 245 250 Q 230 210 233 180 Q 235 155 243 130 Q 247 155 248 180 Q 250 210 245 250 Z" 
+          fill="url(#flameGradient)" opacity="0.85"/>
+    
+    <!-- Right flame curl -->
+    <path d="M 267 250 Q 282 210 279 180 Q 277 155 269 130 Q 265 155 264 180 Q 262 210 267 250 Z" 
+          fill="url(#flameGradient)" opacity="0.85"/>
+    
+    <!-- Bright inner core -->
+    <path d="M 256 265 Q 245 215 248 185 Q 250 150 256 115 Q 262 150 264 185 Q 267 215 256 265 Z" 
+          fill="#FFF9E6" opacity="0.7"/>
+    
+    <!-- Flame tips -->
+    <ellipse cx="243" cy="130" rx="4" ry="6" fill="#FFF9E6" opacity="0.8"/>
+    <ellipse cx="256" cy="90" rx="5" ry="8" fill="#FFF9E6" opacity="0.9"/>
+    <ellipse cx="269" cy="130" rx="4" ry="6" fill="#FFF9E6" opacity="0.8"/>
+    
+    <!-- Small dancing flames -->
+    <path d="M 235 200 Q 228 175 230 160 Q 232 148 237 140 Q 239 150 240 160 Q 241 175 235 200 Z" 
+          fill="url(#flameGradient)" opacity="0.7"/>
+    <path d="M 277 200 Q 284 175 282 160 Q 280 148 275 140 Q 273 150 272 160 Q 271 175 277 200 Z" 
+          fill="url(#flameGradient)" opacity="0.7"/>
+  </g>
+  
+  <!-- Sparkles around flame -->
+  <g opacity="0.7">
+    <circle cx="220" cy="150" r="2.5" fill="#FFE57F">
+      <animate attributeName="opacity" values="0.3;1;0.3" dur="2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="292" cy="140" r="2.5" fill="#FFE57F">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="1.6s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="228" cy="110" r="2" fill="#FFF9E6">
+      <animate attributeName="opacity" values="0.4;1;0.4" dur="2.3s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="284" cy="105" r="2" fill="#FFF9E6">
+      <animate attributeName="opacity" values="0.6;1;0.6" dur="1.9s" repeatCount="indefinite"/>
+    </circle>
+    <!-- Star sparkle -->
+    <path d="M 210 180 L 212 183 L 215 181 L 213 184 L 216 186 L 213 186 L 212 189 L 211 186 L 208 186 L 211 184 Z" 
+          fill="#FFE57F" opacity="0.8">
+      <animate attributeName="opacity" values="0.3;0.9;0.3" dur="2.5s" repeatCount="indefinite"/>
+    </path>
+    <path d="M 302 175 L 304 178 L 307 176 L 305 179 L 308 181 L 305 181 L 304 184 L 303 181 L 300 181 L 303 179 Z" 
+          fill="#FFE57F" opacity="0.8">
+      <animate attributeName="opacity" values="0.4;1;0.4" dur="2.1s" repeatCount="indefinite"/>
+    </path>
+  </g>
+  
+  <!-- Decorative accent on platform -->
+  <path d="M 256 405 L 250 410 L 262 410 Z" fill="#D4AF37" opacity="0.6"/>
+</svg>

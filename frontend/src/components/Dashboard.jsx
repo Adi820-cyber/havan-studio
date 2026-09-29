@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import Avatar from './Avatar';
+import DashboardGuidePanel from './DashboardGuidePanel';
+import { safeHttpsUrl } from '../utils/safeHttpsUrl';
 
 /**
  * What a signed-in person sees at "/".
@@ -30,7 +32,15 @@ function startOfToday() {
   return d;
 }
 
-export default function Dashboard({ profile, currentUser, onOpenMaker, onOpenCheckInvite, onOpenProfile }) {
+export default function Dashboard({
+  profile,
+  currentUser,
+  onOpenMaker,
+  onOpenCheckInvite,
+  onOpenProfile,
+  dashboardPanel,
+  onCloseDashboardPanel
+}) {
   const [invites, setInvites] = useState({ hosted: [], accepted: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -79,7 +89,8 @@ export default function Dashboard({ profile, currentUser, onOpenMaker, onOpenChe
   const name = profile?.displayName || currentUser?.name || 'there';
   const handle = profile?.handle;
   const socials = profile?.socials || {};
-  const hasSocials = Boolean(socials.instagram || socials.vsco || socials.spotify || socials.playlistUrl);
+  const playlistUrl = safeHttpsUrl(socials.playlistUrl);
+  const hasSocials = Boolean(socials.instagram || socials.vsco || socials.spotify || playlistUrl);
 
   const hour = new Date().getHours();
   const greeting = hour < 5 ? 'Still up' : hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening';
@@ -200,6 +211,7 @@ export default function Dashboard({ profile, currentUser, onOpenMaker, onOpenChe
   );
 
   return (
+    <>
     <main className="lp-container" style={{ paddingTop: 96, paddingBottom: 80 }}>
       {/* ── greeting + actions ── */}
       <div
@@ -214,7 +226,7 @@ export default function Dashboard({ profile, currentUser, onOpenMaker, onOpenChe
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <Avatar name={name} size={46} />
+          <Avatar name={name} avatar={profile?.avatar} avatarUrl={profile?.avatarUrl} size={46} />
           <div>
             <h1
               style={{
@@ -395,9 +407,9 @@ export default function Dashboard({ profile, currentUser, onOpenMaker, onOpenChe
                   <Aperture size={13} strokeWidth={1.8} />{socials.vsco}
                 </span>
               )}
-              {socials.playlistUrl && (
+              {playlistUrl && (
                 <a
-                  href={socials.playlistUrl}
+                  href={playlistUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.84rem', color: '#f5b544', textDecoration: 'none' }}
@@ -416,5 +428,14 @@ export default function Dashboard({ profile, currentUser, onOpenMaker, onOpenChe
         </aside>
       </div>
     </main>
+    {dashboardPanel && (
+      <DashboardGuidePanel
+        type={dashboardPanel}
+        onClose={onCloseDashboardPanel}
+        onOpenMaker={onOpenMaker}
+        onOpenCheckInvite={onOpenCheckInvite}
+      />
+    )}
+    </>
   );
 }

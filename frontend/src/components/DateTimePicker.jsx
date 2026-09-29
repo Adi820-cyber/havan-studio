@@ -38,20 +38,20 @@ function fmtTime(h, m) {
 }
 
 /**
- * A scrollable column of time values. Replaces one half of the native time
- * input's dropdown, but styleable — the selected item takes the theme accent.
+ * A single dropdown for one part of the exact time (hour, minute, or meridiem).
+ *
+ * The previous version of this was a 2-column grid of up to 12 buttons packed
+ * into a 112px scrollable box — cramped enough that the selected value could
+ * end up scrolled out of view on open, and next to a separately-positioned
+ * AM/PM column that needed a hand-tuned paddingTop to line up, which broke the
+ * moment font size or content changed. A native <select> has none of those
+ * problems: the browser handles scrolling, positioning and keyboard input, and
+ * it can still carry the theme accent via border/background/color like every
+ * other control here.
  */
-function TimeColumn({ label, values, current, format, onSelect, accent }) {
-  const listRef = useRef(null);
-
-  // Bring the selected value into view when the column appears.
-  useEffect(() => {
-    const el = listRef.current?.querySelector('[data-on="true"]');
-    if (el) el.scrollIntoView({ block: 'center' });
-  }, []);
-
+function TimeSelect({ label, value, options, format, onSelect, accent, width }) {
   return (
-    <div style={{ flex: 1, minWidth: 0 }}>
+    <div style={{ flex: width ? `0 0 ${width}` : 1, minWidth: 0 }}>
       <div
         style={{
           fontSize: '0.66rem',
@@ -64,46 +64,34 @@ function TimeColumn({ label, values, current, format, onSelect, accent }) {
       >
         {label}
       </div>
-      <div
-        ref={listRef}
+      <select
+        value={value}
+        onChange={(e) => onSelect(options[e.target.selectedIndex])}
+        aria-label={label}
         style={{
-          maxHeight: 112,
-          overflowY: 'auto',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: 4,
-          padding: 4,
-          borderRadius: 9,
+          width: '100%',
+          padding: '8px 8px',
+          borderRadius: 8,
+          border: `1px solid ${accent}55`,
           background: 'rgba(0,0,0,0.24)',
-          border: '1px solid rgba(255,255,255,0.08)'
+          color: accent,
+          font: 'inherit',
+          fontSize: '0.86rem',
+          fontWeight: 700,
+          cursor: 'pointer',
+          boxSizing: 'border-box',
+          // Native controls can't take clip-path/box-shadow reliably across
+          // browsers, so this stays a plain rounded box rather than fighting
+          // the platform for a chamfer it won't render consistently.
+          appearance: 'auto'
         }}
       >
-        {values.map((v) => {
-          const on = v === current;
-          return (
-            <button
-              key={v}
-              type="button"
-              data-on={on}
-              onClick={() => onSelect(v)}
-              aria-pressed={on}
-              style={{
-                padding: '6px 0',
-                borderRadius: 7,
-                cursor: 'pointer',
-                font: 'inherit',
-                fontSize: '0.79rem',
-                fontWeight: on ? 700 : 500,
-                border: on ? `1px solid ${accent}` : '1px solid transparent',
-                background: on ? `${accent}2b` : 'rgba(255,255,255,0.03)',
-                color: on ? accent : 'rgba(255,255,255,0.7)'
-              }}
-            >
-              {format(v)}
-            </button>
-          );
-        })}
-      </div>
+        {options.map((v) => (
+          <option key={v} value={v} style={{ background: '#11131c', color: '#fff' }}>
+            {format(v)}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -306,8 +294,15 @@ export default function DateTimePicker({ value, onChange, label = 'When', accent
                         ? '#0a0b10'
                         : 'rgba(255,255,255,0.85)',
                     background: isSel ? accent : 'none',
+                    // A border alone made the selected day hard to spot at a
+                    // glance against a filled background whose lightness
+                    // varies a lot between the five theme accents — some read
+                    // clearly, some looked almost solid. The glow makes the
+                    // selection unambiguous regardless of which accent it is.
+                    boxShadow: isSel ? `0 0 0 2px rgba(255,255,255,0.9), 0 0 12px ${accent}99` : 'none',
                     borderColor: !isSel && isToday ? `${accent}77` : 'transparent',
-                    fontWeight: isSel ? 700 : 500
+                    fontWeight: isSel ? 800 : 500,
+                    fontSize: isSel ? '0.9rem' : '0.84rem'
                   }}
                 >
                   {day.getDate()}
@@ -379,11 +374,11 @@ export default function DateTimePicker({ value, onChange, label = 'When', accent
             </button>
 
             {exact && (
-              <div style={{ display: 'flex', gap: 8, marginTop: 9 }}>
-                <TimeColumn
+              <div style={{ display: 'flex', gap: 8, marginTop: 9, alignItems: 'flex-end' }}>
+                <TimeSelect
                   label="Hour"
-                  values={Array.from({ length: 12 }, (_, i) => i + 1)}
-                  current={hour12}
+                  value={hour12}
+                  options={Array.from({ length: 12 }, (_, i) => i + 1)}
                   format={(v) => String(v)}
                   onSelect={(h12) => {
                     const h24 = meridiem === 'PM' ? (h12 % 12) + 12 : h12 % 12;
@@ -391,43 +386,26 @@ export default function DateTimePicker({ value, onChange, label = 'When', accent
                   }}
                   accent={accent}
                 />
-                <TimeColumn
+                <TimeSelect
                   label="Minute"
-                  values={[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]}
-                  current={selected ? selected.getMinutes() : 0}
+                  value={selected ? selected.getMinutes() : 0}
+                  options={[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]}
                   format={(v) => String(v).padStart(2, '0')}
                   onSelect={(m) => pickTime(selected ? selected.getHours() : 20, m)}
                   accent={accent}
                 />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5, justifyContent: 'flex-start', paddingTop: 19 }}>
-                  {['AM', 'PM'].map((mer) => {
-                    const on = meridiem === mer;
-                    return (
-                      <button
-                        key={mer}
-                        type="button"
-                        onClick={() => {
-                          const base = selected ? selected.getHours() % 12 : 8;
-                          pickTime(mer === 'PM' ? base + 12 : base, selected ? selected.getMinutes() : 0);
-                        }}
-                        aria-pressed={on}
-                        style={{
-                          padding: '7px 11px',
-                          borderRadius: 8,
-                          cursor: 'pointer',
-                          font: 'inherit',
-                          fontSize: '0.76rem',
-                          fontWeight: on ? 700 : 500,
-                          border: on ? `1px solid ${accent}` : '1px solid rgba(255,255,255,0.1)',
-                          background: on ? `${accent}26` : 'rgba(255,255,255,0.03)',
-                          color: on ? accent : 'rgba(255,255,255,0.65)'
-                        }}
-                      >
-                        {mer}
-                      </button>
-                    );
-                  })}
-                </div>
+                <TimeSelect
+                  label="AM/PM"
+                  value={meridiem}
+                  options={['AM', 'PM']}
+                  format={(v) => v}
+                  onSelect={(mer) => {
+                    const base = selected ? selected.getHours() % 12 : 8;
+                    pickTime(mer === 'PM' ? base + 12 : base, selected ? selected.getMinutes() : 0);
+                  }}
+                  accent={accent}
+                  width="80px"
+                />
               </div>
             )}
           </div>
